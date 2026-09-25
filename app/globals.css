@@ -1,0 +1,316 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------------
+   Fuci palette, monochrome. Dark is default; light inverts it.
+   ------------------------------------------------------------------------ */
+:root {
+  --bg: #000000;
+  --bg-2: #0a0a0a;
+  --surface: #111111;
+  --surface-2: #161616;
+  --ink: #ffffff;
+  --ink-2: #b3b3b3;
+  --muted: #7a7a7a;
+  --line: #222222;
+  --kelp: #444444;
+  --gold: #d4d4d4;
+  --glow: #ffffff;
+  --glow-soft: rgba(255, 255, 255, 0.08);
+  --danger: #ef4444;
+  --up: #22c55e;
+  --down: #ef4444;
+  --btn-bg: #ffffff;
+  --btn-ink: #000000;
+  --btn-hover: #e5e5e5;
+  --field: #0a0a0a;
+  --ring: rgba(255, 255, 255, 0.05);
+  --sea-top: #000000;
+  --sea-bottom: #000000;
+  --frond-a: #3a3a3a;
+  --frond-b: #5a5a5a;
+  --bubble: rgba(255, 255, 255, 0.45);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+  --bg: #ffffff;
+  --bg-2: #f7f7f7;
+  --surface: #f4f4f4;
+  --surface-2: #ececec;
+  --ink: #000000;
+  --ink-2: #3d3d3d;
+  --muted: #6b6b6b;
+  --line: #dddddd;
+  --kelp: #bbbbbb;
+  --gold: #333333;
+  --glow: #000000;
+  --glow-soft: rgba(0, 0, 0, 0.06);
+  --danger: #dc2626;
+  --up: #16a34a;
+  --down: #dc2626;
+  --btn-bg: #000000;
+  --btn-ink: #ffffff;
+  --btn-hover: #262626;
+  --field: #ffffff;
+  --ring: rgba(0, 0, 0, 0.05);
+  --sea-top: #ffffff;
+  --sea-bottom: #ffffff;
+  --frond-a: #c4c4c4;
+  --frond-b: #a3a3a3;
+  --bubble: rgba(0, 0, 0, 0.3);
+  color-scheme: light;
+  }
+}
+
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-2: #f7f7f7;
+  --surface: #f4f4f4;
+  --surface-2: #ececec;
+  --ink: #000000;
+  --ink-2: #3d3d3d;
+  --muted: #6b6b6b;
+  --line: #dddddd;
+  --kelp: #bbbbbb;
+  --gold: #333333;
+  --glow: #000000;
+  --glow-soft: rgba(0, 0, 0, 0.06);
+  --danger: #dc2626;
+  --up: #16a34a;
+  --down: #dc2626;
+  --btn-bg: #000000;
+  --btn-ink: #ffffff;
+  --btn-hover: #262626;
+  --field: #ffffff;
+  --ring: rgba(0, 0, 0, 0.05);
+  --sea-top: #ffffff;
+  --sea-bottom: #ffffff;
+  --frond-a: #c4c4c4;
+  --frond-b: #a3a3a3;
+  --bubble: rgba(0, 0, 0, 0.3);
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-2: var(--bg-2);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-kelp: var(--kelp);
+  --color-gold: var(--gold);
+  --color-glow: var(--glow);
+  --color-danger: var(--danger);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-field: var(--field);
+  --font-display: var(--font-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-jb), ui-monospace, SFMono-Regular, monospace;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+  overflow-x: clip;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--glow);
+  color: var(--bg);
+}
+
+/* Flat page background (flat). */
+.depth {
+  background: var(--bg);
+}
+
+/* Concentric rings, very faint. */
+.rings {
+  background-image: repeating-radial-gradient(circle at 50% 50%, transparent 0 38px, var(--ring) 38px 40px);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.glow-text {
+  color: var(--ink);
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 4px;
+  padding: 0.7rem 1.1rem;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn-primary {
+  background: var(--btn-bg);
+  color: var(--btn-ink);
+}
+.btn-primary:hover {
+  background: var(--btn-hover);
+}
+.btn-ghost {
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+.btn-ghost:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Tabs: outlined, uppercase, letter-spaced. */
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.tab:hover {
+  color: var(--ink);
+}
+.tab-active {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.field {
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  outline: none;
+}
+.field::placeholder {
+  color: var(--muted);
+}
+.field:focus {
+  border-color: var(--ink);
+}
+
+code,
+pre {
+  font-family: var(--font-mono);
+}
+
+/* Scroll-driven reveal (progressive enhancement). */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: rise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
+    .parallax-slow {
+      animation: drift linear both;
+      animation-timeline: scroll(root);
+    }
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes drift {
+  to {
+    transform: translateY(18vh);
+  }
+}
+
+@keyframes sway {
+  0%,
+  100% {
+    transform: rotate(-2.5deg);
+  }
+  50% {
+    transform: rotate(2.5deg);
+  }
+}
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.live-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--up);
+  box-shadow: 0 0 8px var(--up);
+  animation: pulse-dot 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-dot {
+    animation: none;
+  }
+}
+
+/* Ticker marquee */
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee {
+  animation: marquee 60s linear infinite;
+}
+.marquee:hover {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee {
+    animation: none;
+  }
+}
