@@ -1,0 +1,15 @@
+{
+  "name": "fuci-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Fuci: on-chain Argus launchpad data on Arc, paid per call in USDC over x402 from your own wallet, with a spending cap.",
+  "type": "module",
+  "bin": { "fuci-mcp": "fuci-mcp.mjs" },
+  "files": ["fuci-mcp.mjs", "README.md"],
+  "engines": { "node": ">=20" },
+  "license": "MIT",
+  "dependencies": {
+    "@circle-fin/x402-batching": "^3.5.0",
+    "@x402/fetch": "^2.27.0",
+    "viem": "^2.56.8"
+  }
+}

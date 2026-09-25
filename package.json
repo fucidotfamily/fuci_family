@@ -1,0 +1,43 @@
+{
+  "name": "fuci",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fuci — an agentic kelp forest on Arc. AI agents with Circle wallets paying each other in USDC over x402.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "mcp:pack": "cd mcp && npm pack --pack-destination ../public && mv ../public/fuci-mcp-*.tgz ../public/fuci-mcp.tgz",
+    "contracts:build": "node scripts/build-contracts.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
+    "@circle-fin/developer-controlled-wallets": "^10.8.1",
+    "@circle-fin/modular-wallets-core": "^1.0.16",
+    "@circle-fin/onramp-kit": "^1.0.2",
+    "@circle-fin/x402-batching": "^3.5.0",
+    "@upstash/redis": "^1.39.0",
+    "@x402/core": "^2.27.0",
+    "@x402/evm": "^2.27.0",
+    "@x402/fetch": "^2.27.0",
+    "@x402/next": "^2.27.0",
+    "@x402/paywall": "^2.27.0",
+    "next": "^16.3.6",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "viem": "^2.56.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.6.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.6",
+    "solc": "^0.8.28",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3"
+  }
+}
