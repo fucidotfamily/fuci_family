@@ -3,31 +3,70 @@
 import Link from "next/link";
 import { KelpForest } from "./KelpForest";
 import { useOnrampEnabled } from "./BuyUsdc";
+import { LiveFeed } from "./LiveFeed";
+import type { FeedItem } from "@/lib/feed";
 
 type Showcase = { id: string; name: string } | null;
 
 const TRUST = ["Arc mainnet", "USDC", "x402", "Circle Gateway", "ERC-8004"];
 
-export function Hero({ showcase, agentsOnArc, fuciOnChain, trades }: { showcase: Showcase; agentsOnArc: number | null; fuciOnChain: number; trades: number }) {
+export type Proof = {
+  calls: number | null;
+  usdcSettled: number | null;
+  feed: FeedItem[];
+  now: number;
+};
+
+export function Hero({
+  showcase,
+  agentsOnArc,
+  fuciOnChain,
+  trades,
+  proof,
+}: {
+  showcase: Showcase;
+  agentsOnArc: number | null;
+  fuciOnChain: number;
+  trades: number;
+  proof: Proof;
+}) {
   const onramp = useOnrampEnabled();
   // The kelp grows with the number of agents on Arc (read from the registry).
   const fronds = agentsOnArc ? Math.min(60, Math.round(agentsOnArc / 4)) : 0;
 
   return (
-    <section className="relative isolate overflow-hidden border-b border-line" aria-labelledby="hero-title">
-      <div aria-hidden="true" className="rings absolute inset-0 -z-20" style={{ maskImage: "radial-gradient(ellipse 55% 65% at 70% 45%, #000 20%, transparent 75%)" }} />
-      <KelpForest fronds={fronds} pulse={trades} className="absolute inset-x-0 bottom-0 -z-10 h-[38%] w-full opacity-40" />
+    <section
+      className="relative isolate overflow-hidden border-b border-line"
+      aria-labelledby="hero-title"
+    >
+      <div
+        aria-hidden="true"
+        className="rings absolute inset-0 -z-20"
+        style={{
+          maskImage:
+            "radial-gradient(ellipse 55% 65% at 70% 45%, #000 20%, transparent 75%)",
+        }}
+      />
+      <KelpForest
+        fronds={fronds}
+        pulse={trades}
+        className="absolute inset-x-0 bottom-0 -z-10 h-[38%] w-full opacity-40"
+      />
 
       <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 pt-16 pb-24 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:pt-24 lg:pb-32">
         <div>
           <p className="eyebrow flex items-center gap-2">
             <span className="live-dot" /> Live on Arc
           </p>
-          <h1 id="hero-title" className="font-display mt-5 text-5xl leading-[1.02] font-bold tracking-tight sm:text-6xl lg:text-7xl">
+          <h1
+            id="hero-title"
+            className="font-display mt-5 text-5xl leading-[1.02] font-bold tracking-tight sm:text-6xl lg:text-7xl"
+          >
             AI agents that pay their own way.
           </h1>
           <p className="mt-6 max-w-lg text-lg text-ink-2">
-            Spawn an agent in a minute. It gets its own USDC wallet, works on your schedule and pays per call over x402. No API keys, no
+            Spawn an agent in a minute. It gets its own USDC wallet, works on
+            your schedule and pays per call over x402. No API keys, no
             subscriptions.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
@@ -39,12 +78,51 @@ export function Hero({ showcase, agentsOnArc, fuciOnChain, trades }: { showcase:
             </Link>
           </div>
           {onramp && (
-            <Link href="/spawn" className="mt-5 inline-flex items-center gap-2 rounded-full border border-up/60 bg-up/10 px-3 py-1.5 text-sm text-ink hover:border-up">
-              <span className="rounded-full bg-up px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-black">New</span>
+            <Link
+              href="/spawn"
+              className="mt-5 inline-flex items-center gap-2 rounded-full border border-up/60 bg-up/10 px-3 py-1.5 text-sm text-ink hover:border-up"
+            >
+              <span className="rounded-full bg-up px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-black">
+                New
+              </span>
               No crypto? Fund your agent with a debit card or bank transfer →
             </Link>
           )}
-          <ul className="mt-8 flex flex-wrap gap-x-4 gap-y-2 font-mono text-[11px] uppercase tracking-widest text-muted">
+          {/* Proof, not promises: live counts, each linked to where it can be checked. */}
+          <dl className="mt-8 grid max-w-lg grid-cols-3 gap-3">
+            {[
+              {
+                v: proof.calls,
+                label: "x402 calls paid",
+                href: "/stats",
+                fmt: (n: number) => n.toLocaleString("en-US"),
+              },
+              {
+                v: proof.usdcSettled,
+                label: "USDC settled",
+                href: "/stats",
+                fmt: (n: number) => `$${n.toFixed(2)}`,
+              },
+              {
+                v: fuciOnChain,
+                label: "agents on-chain",
+                href: "/agents",
+                fmt: (n: number) => n.toLocaleString("en-US"),
+              },
+            ].map((x) => (
+              <a
+                key={x.label}
+                href={x.href}
+                className="rounded-md border border-line bg-surface/60 px-3 py-2.5 hover:border-ink"
+              >
+                <dd className="font-display text-2xl font-semibold tabular-nums text-ink">
+                  {x.v === null ? "…" : x.fmt(x.v)}
+                </dd>
+                <dt className="mt-0.5 text-xs text-ink-2">{x.label}</dt>
+              </a>
+            ))}
+          </dl>
+          <ul className="mt-6 flex flex-wrap gap-x-4 gap-y-2 font-mono text-[11px] uppercase tracking-widest text-muted">
             {TRUST.map((t) => (
               <li key={t}>{t}</li>
             ))}
@@ -53,7 +131,11 @@ export function Hero({ showcase, agentsOnArc, fuciOnChain, trades }: { showcase:
 
         <div className="relative">
           {showcase ? (
-            <Link href={`/agent/${showcase.id}`} className="group block" aria-label={`See ${showcase.name}'s agent card`}>
+            <Link
+              href={`/agent/${showcase.id}`}
+              className="group block"
+              aria-label={`See ${showcase.name}'s agent card`}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element -- generated share card from our own route */}
               <img
                 src={`/agent/${showcase.id}/opengraph-image`}
@@ -66,10 +148,17 @@ export function Hero({ showcase, agentsOnArc, fuciOnChain, trades }: { showcase:
           ) : (
             <ExampleCard />
           )}
-          <p className="mt-4 text-center font-mono text-xs text-muted">
-            {agentsOnArc ? `${agentsOnArc.toLocaleString("en-US")} agents on Arc` : "…"}
+          <div className="mt-6">
+            <LiveFeed initial={proof.feed} serverNow={proof.now} rows={4} />
+          </div>
+          <p className="mt-3 text-center font-mono text-xs text-muted">
+            {agentsOnArc
+              ? `${agentsOnArc.toLocaleString("en-US")} agents on Arc`
+              : "…"}
             {` · ${fuciOnChain} Fuci ${fuciOnChain === 1 ? "agent" : "agents"} on-chain`}
-            {trades ? ` · ${trades.toLocaleString("en-US")} autopilot ${trades === 1 ? "trade" : "trades"}` : ""}
+            {trades
+              ? ` · ${trades.toLocaleString("en-US")} autopilot ${trades === 1 ? "trade" : "trades"}`
+              : ""}
           </p>
         </div>
       </div>
@@ -86,21 +175,40 @@ function ExampleCard() {
     ["Spent", "0.142 USDC"],
   ];
   return (
-    <Link href="/spawn" className="card rings group relative block aspect-[1200/630] w-full overflow-hidden p-5 transition duration-500 hover:-translate-y-1 sm:p-7 lg:rotate-[-2deg] lg:hover:rotate-0">
+    <Link
+      href="/spawn"
+      className="card rings group relative block aspect-[1200/630] w-full overflow-hidden p-5 transition duration-500 hover:-translate-y-1 sm:p-7 lg:rotate-[-2deg] lg:hover:rotate-0"
+    >
       <div className="flex items-center justify-between">
         <span className="font-display text-lg font-bold">fuci</span>
-        <span className="rounded border border-ink px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest">Agent on Arc</span>
+        <span className="rounded border border-ink px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest">
+          Agent on Arc
+        </span>
       </div>
       <div className="mt-4 flex items-center gap-4 sm:mt-6">
         <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full border-2 border-ink bg-surface-2 sm:h-20 sm:w-20">
-          <svg viewBox="0 0 24 24" className="h-7 w-7 sm:h-10 sm:w-10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-7 w-7 sm:h-10 sm:w-10"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
             <path d="M12 21v-7m0 0c0-3-3-4-4-8m4 8c0-3 3-4 4-8M8 6c-.5-2-2-2.5-2.5-4M8 6c.5-2 1.5-2.5 2-4m6 4c-.5-2-1.5-2.5-2-4m2 4c.5-2 2-2.5 2.5-4" />
           </svg>
         </span>
         <span>
-          <span className="block font-mono text-[10px] uppercase tracking-widest text-muted">Your agent card</span>
-          <span className="font-display block text-3xl font-bold leading-none sm:text-5xl">your-agent</span>
-          <span className="mt-1 block text-sm text-ink-2">Launch Scout · auto</span>
+          <span className="block font-mono text-[10px] uppercase tracking-widest text-muted">
+            Your agent card
+          </span>
+          <span className="font-display block text-3xl font-bold leading-none sm:text-5xl">
+            your-agent
+          </span>
+          <span className="mt-1 block text-sm text-ink-2">
+            Launch Scout · auto
+          </span>
         </span>
       </div>
       <dl className="absolute inset-x-5 bottom-5 grid grid-cols-4 gap-2 border-t border-line pt-3 sm:inset-x-7 sm:bottom-7">

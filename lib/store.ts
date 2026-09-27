@@ -76,6 +76,9 @@ export type TideEvent = {
   tool?: string;
   usdc: number;
   tx?: string;
+  /** The wallet that signed an x402 payment, and the network it paid on (CAIP-2). */
+  payer?: string;
+  network?: string;
 };
 
 export type Stats = {

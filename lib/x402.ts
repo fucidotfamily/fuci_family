@@ -108,6 +108,30 @@ const notConfigured = () =>
     { status: 503 },
   );
 
+/** Who paid, and on which network, read from the x402 payment header (for the public payments feed). */
+function payerOf(req: NextRequest): { payer?: string; network?: string } {
+  const raw =
+    req.headers.get("payment-signature") ?? req.headers.get("x-payment");
+  if (!raw) return {};
+  try {
+    const p = JSON.parse(Buffer.from(raw, "base64").toString("utf8")) as {
+      network?: string;
+      accepted?: { network?: string };
+      payload?: { authorization?: { from?: string } };
+    };
+    const from = p.payload?.authorization?.from;
+    const network = p.accepted?.network ?? p.network;
+    return {
+      ...(from && /^0x[0-9a-fA-F]{40}$/.test(from)
+        ? { payer: from.toLowerCase() }
+        : {}),
+      ...(network && /^eip155:\d+$/.test(network) ? { network } : {}),
+    };
+  } catch {
+    return {};
+  }
+}
+
 /** Wrap a route handler so it costs `tool.price` USDC over x402 on Arc. */
 export function paid(tool: FuciTool, handler: Handler): Handler {
   const recording: Handler = async (req) => {
@@ -118,6 +142,7 @@ export function paid(tool: FuciTool, handler: Handler): Handler {
         agent: req.headers.get("x-fuci-agent") ?? "",
         tool: tool.id,
         usdc: priceToNumber(tool.price),
+        ...payerOf(req),
       });
     }
     return res;

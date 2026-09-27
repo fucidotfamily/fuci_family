@@ -6,12 +6,22 @@ import { FuciToken } from "@/components/FuciToken";
 import { ListedOn } from "@/components/ListedOn";
 import { SHOW_FUCI_TOKEN } from "@/lib/config";
 import { getStats } from "@/lib/store";
+import { liveFeedNow } from "@/lib/feed";
 import { storedIndex } from "@/lib/agentIndex";
 import { getForest, refreshForest } from "@/lib/forest";
 import { after } from "next/server";
 import type { Forest } from "@/lib/forest";
 
-const EMPTY_FOREST: Forest = { agentsCreated: 0, agentIds: [], creationFeesUsdc: 0, trades: 0, tradeFeesUsdc: 0, events: [], lastBlock: null, updatedAt: null };
+const EMPTY_FOREST: Forest = {
+  agentsCreated: 0,
+  agentIds: [],
+  creationFeesUsdc: 0,
+  trades: 0,
+  tradeFeesUsdc: 0,
+  events: [],
+  lastBlock: null,
+  updatedAt: null,
+};
 
 // Rendered per request so the hero card and live numbers are always current.
 export const dynamic = "force-dynamic";
@@ -39,27 +49,50 @@ async function safeAsync(name: string, render: () => Promise<React.ReactNode>) {
 
 export default async function Home() {
   // A real agent card for the hero, and the size of the Arc agent registry.
-  const [stats, index, forest] = await Promise.all([
+  const [stats, index, forest, feed] = await Promise.all([
     getStats().catch(() => null),
     storedIndex().catch(() => null),
     getForest().catch(() => ({ forest: EMPTY_FOREST, stale: true })),
+    liveFeedNow(),
   ]);
   // Keep the on-chain numbers fresh without making this page wait.
   if (forest.stale) after(() => refreshForest().catch(() => undefined));
   // Fuci agents = the ones created on-chain through the Fuci factory.
   const created = new Set(forest.forest.agentIds);
-  const fuciAgents = (index?.index?.agents ?? []).filter((a) => created.has(a.agentId)).sort((a, b) => a.rank - b.rank);
+  const fuciAgents = (index?.index?.agents ?? [])
+    .filter((a) => created.has(a.agentId))
+    .sort((a, b) => a.rank - b.rank);
   // Only agents that are on-chain (created through the Fuci factory) are showcased.
-  const onChain = (stats?.top ?? []).filter((a) => a.erc8004Id !== undefined && created.has(a.erc8004Id));
+  const onChain = (stats?.top ?? []).filter(
+    (a) => a.erc8004Id !== undefined && created.has(a.erc8004Id),
+  );
   const pick = onChain.find((a) => a.image || a.x) ?? onChain[0];
   const showcase = pick ? { id: pick.id, name: pick.name } : null;
   const agentsOnArc = index?.index?.total ?? null;
 
   return (
     <main className="depth">
-      <Hero showcase={showcase} agentsOnArc={agentsOnArc} fuciOnChain={fuciAgents.length} trades={forest.forest.trades} />
+      <Hero
+        showcase={showcase}
+        agentsOnArc={agentsOnArc}
+        fuciOnChain={fuciAgents.length}
+        trades={forest.forest.trades}
+        proof={{
+          calls: stats?.calls ?? null,
+          usdcSettled: stats?.usdcSettled ?? null,
+          feed: feed.items,
+          now: feed.now,
+        }}
+      />
       <ListedOn />
-      {safe("stats", () => TideStats({ forest: forest.forest, fuciAgents, agentsOnArc, x402Calls: stats?.calls ?? null }))}
+      {safe("stats", () =>
+        TideStats({
+          forest: forest.forest,
+          fuciAgents,
+          agentsOnArc,
+          x402Calls: stats?.calls ?? null,
+        }),
+      )}
       <HowItWorks />
       <Capabilities />
       {SHOW_FUCI_TOKEN && (await safeAsync("fuci", () => FuciToken()))}
