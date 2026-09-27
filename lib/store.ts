@@ -592,6 +592,33 @@ export async function releaseLock(key: string) {
   else mem.json.delete(k);
 }
 
+/**
+ * One money-moving action at a time per agent wallet: trades, paid asks, automatic runs and
+ * withdrawals share this lock, so a daily limit is checked and recorded without another action
+ * slipping in between, and the wallet never sends two transactions at once.
+ */
+export const AGENT_LOCK_SEC = 90;
+export class AgentBusyError extends Error {
+  constructor() {
+    super(
+      "This agent is busy with another trade or payment. Try again in a moment.",
+    );
+  }
+}
+export const agentLockKey = (agentId: string) => `agent-wallet:${agentId}`;
+export async function withAgentLock<T>(
+  agentId: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  if (!(await acquireLock(agentLockKey(agentId), AGENT_LOCK_SEC)))
+    throw new AgentBusyError();
+  try {
+    return await fn();
+  } finally {
+    await releaseLock(agentLockKey(agentId));
+  }
+}
+
 /** Set `key` only if it is not set yet (optionally expiring). True when this call wrote it. */
 export async function kvSetNx(key: string, value: unknown, ttlSec?: number) {
   if (redis)

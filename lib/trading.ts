@@ -15,6 +15,7 @@ import {
   setTradingActive,
   tradeSpentToday,
   tradingAgents,
+  withAgentLock,
   type AgentCard,
 } from "./store";
 import {
@@ -155,30 +156,10 @@ type Action =
 const fmtPrice = (p: number) => (p >= 1 ? p.toFixed(4) : p.toPrecision(3));
 const txLink = (tx: string) => `${EXPLORER_URL}/tx/${tx}`;
 
-/**
- * One trade at a time per agent: owner buys/sells and the autopilot share this lock, so the daily
- * limit is checked and recorded without another trade slipping in between.
- */
-const TRADE_LOCK_SEC = 90;
-export class TradeBusyError extends Error {
-  constructor() {
-    super(
-      "Another trade for this agent is still running. Try again in a moment.",
-    );
-  }
-}
-async function withTradeLock<T>(
-  agentId: string,
-  fn: () => Promise<T>,
-): Promise<T> {
-  const key = `trade:${agentId}`;
-  if (!(await acquireLock(key, TRADE_LOCK_SEC))) throw new TradeBusyError();
-  try {
-    return await fn();
-  } finally {
-    await releaseLock(key);
-  }
-}
+/** Trades use the shared per-agent wallet lock (see withAgentLock in lib/store). */
+export { AgentBusyError as TradeBusyError } from "./store";
+const withTradeLock = <T>(agentId: string, fn: () => Promise<T>) =>
+  withAgentLock(agentId, fn);
 
 /** Run the autopilot for every trading agent. Called from the automation tick. */
 export async function runTradingTick(budgetMs = 35_000) {
