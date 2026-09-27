@@ -124,6 +124,22 @@ Want the assistant to **pay** from your own wallet, with caps it can't change? U
 }
 ```
 
+## Agent skills: one line, and your AI knows Fuci
+
+Teach Claude Code, Cursor, Codex or any agent that supports [skills](https://github.com/vercel-labs/skills) to use Fuci:
+
+```bash
+npx skills add fucidotfamily/fuci_family
+```
+
+| Skill | What your agent can do | Cost |
+| --- | --- | --- |
+| [`fuci-risk`](skills/fuci-risk/SKILL.md) | "Is this token safe?" → an A–F grade for any Arc token or DeFi protocol, every factor sourced | Free (or 0.002 USDC over x402, no rate limit) |
+| [`fuci-argus`](skills/fuci-argus/SKILL.md) | New Argus launches, a token's bonding progress and trades, the market mood | 0.0005–0.002 USDC per call over x402 |
+| [`fuci-x402-market`](skills/fuci-x402-market/SKILL.md) | Find paid APIs on Arc it can buy per call, with prices | Free |
+
+Paid calls go through Circle Gateway (pay from Arc, Base, Arbitrum, Ethereum, Polygon and more) with the [Circle CLI](https://agents.circle.com) or the Fuci MCP server below. The skills always ask before spending.
+
 ## An open market for paid APIs
 
 <table>
