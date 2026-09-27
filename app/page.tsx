@@ -3,10 +3,11 @@ import { HowItWorks } from "@/components/HowItWorks";
 import { TideStats } from "@/components/TideStats";
 import { Capabilities } from "@/components/Capabilities";
 import { FuciToken } from "@/components/FuciToken";
+import { ListedOn } from "@/components/ListedOn";
 import { SHOW_FUCI_TOKEN } from "@/lib/config";
 import { getStats } from "@/lib/store";
 import { storedIndex } from "@/lib/agentIndex";
-import { getForest, refreshForest, treasuryBalance } from "@/lib/forest";
+import { getForest, refreshForest } from "@/lib/forest";
 import { after } from "next/server";
 import type { Forest } from "@/lib/forest";
 
@@ -38,25 +39,27 @@ async function safeAsync(name: string, render: () => Promise<React.ReactNode>) {
 
 export default async function Home() {
   // A real agent card for the hero, and the size of the Arc agent registry.
-  const [stats, index, forest, treasury] = await Promise.all([
+  const [stats, index, forest] = await Promise.all([
     getStats().catch(() => null),
     storedIndex().catch(() => null),
     getForest().catch(() => ({ forest: EMPTY_FOREST, stale: true })),
-    treasuryBalance().catch(() => null),
   ]);
   // Keep the on-chain numbers fresh without making this page wait.
   if (forest.stale) after(() => refreshForest().catch(() => undefined));
   // Fuci agents = the ones created on-chain through the Fuci factory.
   const created = new Set(forest.forest.agentIds);
   const fuciAgents = (index?.index?.agents ?? []).filter((a) => created.has(a.agentId)).sort((a, b) => a.rank - b.rank);
-  const pick = stats?.top.find((a) => a.image || a.x) ?? stats?.top[0];
+  // Only agents that are on-chain (created through the Fuci factory) are showcased.
+  const onChain = (stats?.top ?? []).filter((a) => a.erc8004Id !== undefined && created.has(a.erc8004Id));
+  const pick = onChain.find((a) => a.image || a.x) ?? onChain[0];
   const showcase = pick ? { id: pick.id, name: pick.name } : null;
   const agentsOnArc = index?.index?.total ?? null;
 
   return (
     <main className="depth">
       <Hero showcase={showcase} agentsOnArc={agentsOnArc} fuciOnChain={fuciAgents.length} trades={forest.forest.trades} />
-      {safe("stats", () => TideStats({ forest: forest.forest, fuciAgents, treasury }))}
+      <ListedOn />
+      {safe("stats", () => TideStats({ forest: forest.forest, fuciAgents, agentsOnArc, x402Calls: stats?.calls ?? null }))}
       <HowItWorks />
       <Capabilities />
       {SHOW_FUCI_TOKEN && (await safeAsync("fuci", () => FuciToken()))}

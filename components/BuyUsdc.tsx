@@ -11,6 +11,19 @@ const onrampEnabled = () =>
     .then((b: { enabled?: boolean }) => Boolean(b.enabled))
     .catch(() => false));
 
+/** True once this deployment has "Buy USDC with card" switched on. */
+export function useOnrampEnabled() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    let live = true;
+    onrampEnabled().then((v) => live && setOn(v));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return on;
+}
+
 type Target = { agentId: string; address?: never } | { address: string; agentId?: never };
 
 async function newSession(target: Target): Promise<OnrampSession> {
@@ -26,7 +39,7 @@ const NOT_COMPLETED: Record<string, string> = {
 };
 
 /**
- * "Buy USDC with card": Circle's hosted onramp (debit card, Apple Pay, Google Pay, identity check
+ * "Buy USDC with card": Circle's hosted onramp (debit card or bank transfer, identity check
  * included) sends USDC on Arc straight to `agentId`'s wallet or to `address`. Opens as a popup (a
  * session is prepared ahead so the click can open it at once), or inline where popups can't open.
  */
@@ -104,7 +117,7 @@ export function BuyUsdc({ target, label = "Buy USDC with card", onSettled, class
 
   return (
     <>
-      <button type="button" className={className} disabled={!session} onClick={open} title="Debit card, Apple Pay or Google Pay, via Circle">
+      <button type="button" className={className} disabled={!session} onClick={open} title="Debit card or bank transfer, via Circle">
         {session ? label : "Preparing…"}
       </button>
       {msg && <span className={`basis-full text-xs ${msg.ok ? "text-up" : "text-danger"}`}>{msg.text}</span>}

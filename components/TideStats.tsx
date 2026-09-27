@@ -27,29 +27,21 @@ function agentHref(a: IndexedAgent) {
 export function TideStats({
   forest,
   fuciAgents,
-  treasury,
+  agentsOnArc,
+  x402Calls,
 }: {
   forest: Forest;
   fuciAgents: IndexedAgent[];
-  treasury: { address: string; usdc: number } | null;
+  agentsOnArc: number | null;
+  x402Calls: number | null;
 }) {
   const now = clock();
-  const fees = forest.creationFeesUsdc + forest.tradeFeesUsdc;
-  const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const n = (v: number | null) => (v === null ? "…" : v.toLocaleString("en-US"));
+  // Growth numbers up top; fees and the treasury stay one click away on /stats.
   const tiles: { label: string; value: string; hint: ReactNode }[] = [
-    { label: "Agents on-chain", value: forest.agentsCreated.toLocaleString("en-US"), hint: "created via the Fuci factory" },
-    { label: "Fees earned", value: usd(fees), hint: `creation + ${forest.trades} autopilot ${forest.trades === 1 ? "trade" : "trades"}` },
-    {
-      label: "Fuci treasury",
-      value: treasury ? usd(treasury.usdc) : "…",
-      hint: treasury ? (
-        <a className="underline" href={`${EXPLORER_URL}/address/${treasury.address}`} target="_blank" rel="noreferrer">
-          Safe multisig · {treasury.address.slice(0, 6)}…{treasury.address.slice(-4)}
-        </a>
-      ) : (
-        "USDC on Arc"
-      ),
-    },
+    { label: "AI agents on Arc", value: n(agentsOnArc), hint: "every ERC-8004 agent on Arc" },
+    { label: "Fuci agents on-chain", value: n(forest.agentsCreated), hint: "created via the Fuci factory" },
+    { label: "x402 calls paid", value: n(x402Calls), hint: "agents paying per call in USDC" },
   ];
   const events = forest.events;
 
@@ -69,7 +61,7 @@ export function TideStats({
         </Link>
       </div>
 
-      <dl className="mt-8 grid gap-3 sm:grid-cols-3">
+      <dl className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
         {tiles.map((t) => (
           <div key={t.label} className="card reveal p-5">
             <dt className="text-sm text-muted">{t.label}</dt>
@@ -78,8 +70,13 @@ export function TideStats({
           </div>
         ))}
       </dl>
+      <p className="mt-3 text-right font-mono text-[11px] text-muted">
+        <Link href="/stats" className="underline underline-offset-2 hover:text-ink">
+          Fees, treasury and contracts →
+        </Link>
+      </p>
 
-      <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1.2fr]">
+      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         <div className="card reveal p-5">
           <h3 className="font-display text-lg font-semibold">Fuci agents on Arc</h3>
           {fuciAgents.length ? (
@@ -89,9 +86,9 @@ export function TideStats({
                   <a href={agentHref(a)} className="flex items-center gap-3 py-2.5 hover:text-ink">
                     {a.image ? (
                       // eslint-disable-next-line @next/next/no-img-element -- image from the agent's registration file
-                      <img src={a.image} alt="" width={32} height={32} loading="lazy" className="h-8 w-8 rounded-full border border-line object-cover" />
+                      <img src={a.image} alt="" width={32} height={32} loading="lazy" className="h-8 w-8 shrink-0 rounded-full border border-line object-cover" />
                     ) : (
-                      <span className="h-8 w-8 rounded-full border border-line" />
+                      <span className="h-8 w-8 shrink-0 rounded-full border border-line" />
                     )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-medium">{a.name ?? "Unnamed agent"}</span>
@@ -100,7 +97,7 @@ export function TideStats({
                         {a.x402 ? " · x402" : ""}
                       </span>
                     </span>
-                    <span className="text-right font-mono text-xs text-ink-2">
+                    <span className="shrink-0 text-right font-mono text-xs text-ink-2">
                       #{i + 1}
                       {a.reputation?.count ? <span className="block text-muted">★ {a.reputation.score?.toFixed(0)} · {a.reputation.count}</span> : null}
                     </span>

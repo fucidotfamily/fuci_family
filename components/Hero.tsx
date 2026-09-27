@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { KelpForest } from "./KelpForest";
+import { useOnrampEnabled } from "./BuyUsdc";
 
 type Showcase = { id: string; name: string } | null;
 
 const TRUST = ["Arc mainnet", "USDC", "x402", "Circle Gateway", "ERC-8004"];
 
 export function Hero({ showcase, agentsOnArc, fuciOnChain, trades }: { showcase: Showcase; agentsOnArc: number | null; fuciOnChain: number; trades: number }) {
+  const onramp = useOnrampEnabled();
   // The kelp grows with the number of agents on Arc (read from the registry).
   const fronds = agentsOnArc ? Math.min(60, Math.round(agentsOnArc / 4)) : 0;
 
@@ -36,6 +38,12 @@ export function Hero({ showcase, agentsOnArc, fuciOnChain, trades }: { showcase:
               Browse agents
             </Link>
           </div>
+          {onramp && (
+            <Link href="/spawn" className="mt-5 inline-flex items-center gap-2 rounded-full border border-up/60 bg-up/10 px-3 py-1.5 text-sm text-ink hover:border-up">
+              <span className="rounded-full bg-up px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-black">New</span>
+              No crypto? Fund your agent with a debit card or bank transfer →
+            </Link>
+          )}
           <ul className="mt-8 flex flex-wrap gap-x-4 gap-y-2 font-mono text-[11px] uppercase tracking-widest text-muted">
             {TRUST.map((t) => (
               <li key={t}>{t}</li>

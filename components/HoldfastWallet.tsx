@@ -1,9 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createPublicClient, formatUnits, http, numberToHex, parseAbiItem, type Transport } from "viem";
+import {
+  createPublicClient,
+  formatUnits,
+  numberToHex,
+  parseAbiItem,
+  type Transport,
+} from "viem";
 import { arc, arcTestnet } from "viem/chains";
-import { walletError } from "@/lib/browserWallet";
+import { publicClient, walletError } from "@/lib/browserWallet";
 
 /**
  * Holdfast = the human owner's wallet. Two real options:
@@ -13,7 +19,9 @@ import { walletError } from "@/lib/browserWallet";
 
 const CLIENT_KEY = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_KEY ?? "";
 // Circle's standard Modular Wallets endpoint; only the client key is per-account.
-const CLIENT_URL = process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL || "https://modular-sdk.circle.com/v1/rpc/w3s/buidl";
+const CLIENT_URL =
+  process.env.NEXT_PUBLIC_CIRCLE_CLIENT_URL ||
+  "https://modular-sdk.circle.com/v1/rpc/w3s/buidl";
 const TESTNET = process.env.NEXT_PUBLIC_ARC_NETWORK === "testnet";
 const CHAIN = TESTNET ? arcTestnet : arc;
 const CHAIN_PATH = TESTNET ? "arcTestnet" : "arc";
@@ -22,8 +30,13 @@ const STORAGE_KEY = "fuci-holdfast-credential";
 
 export const PASSKEY_ENABLED = Boolean(CLIENT_KEY);
 
-type Eip1193 = { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> };
-const injected = () => (typeof window === "undefined" ? undefined : (window as unknown as { ethereum?: Eip1193 }).ethereum);
+type Eip1193 = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
+const injected = () =>
+  typeof window === "undefined"
+    ? undefined
+    : (window as unknown as { ethereum?: Eip1193 }).ethereum;
 
 export type Holdfast = {
   address: `0x${string}`;
@@ -34,12 +47,20 @@ export type Holdfast = {
 
 async function connectBrowser(): Promise<Holdfast> {
   const eth = injected();
-  if (!eth) throw new Error("No browser wallet found. Install MetaMask or Rabby, or use a passkey.");
-  const [address] = (await eth.request({ method: "eth_requestAccounts" })) as `0x${string}`[];
+  if (!eth)
+    throw new Error(
+      "No browser wallet found. Install MetaMask or Rabby, or use a passkey.",
+    );
+  const [address] = (await eth.request({
+    method: "eth_requestAccounts",
+  })) as `0x${string}`[];
   if (!address) throw new Error("No account was shared");
   const chainId = numberToHex(CHAIN.id);
   try {
-    await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId }] });
+    await eth.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId }],
+    });
   } catch {
     await eth.request({
       method: "wallet_addEthereumChain",
@@ -49,7 +70,9 @@ async function connectBrowser(): Promise<Holdfast> {
           chainName: CHAIN.name,
           nativeCurrency: CHAIN.nativeCurrency,
           rpcUrls: CHAIN.rpcUrls.default.http,
-          blockExplorerUrls: CHAIN.blockExplorers ? [CHAIN.blockExplorers.default.url] : [],
+          blockExplorerUrls: CHAIN.blockExplorers
+            ? [CHAIN.blockExplorers.default.url]
+            : [],
         },
       ],
     });
@@ -57,11 +80,18 @@ async function connectBrowser(): Promise<Holdfast> {
   return {
     address,
     kind: "browser",
-    signMessage: async (message) => (await eth.request({ method: "personal_sign", params: [message, address] })) as `0x${string}`,
+    signMessage: async (message) =>
+      (await eth.request({
+        method: "personal_sign",
+        params: [message, address],
+      })) as `0x${string}`,
   };
 }
 
-async function connectPasskey(mode: "register" | "login", username?: string): Promise<Holdfast> {
+async function connectPasskey(
+  mode: "register" | "login",
+  username?: string,
+): Promise<Holdfast> {
   const mw = await import("@circle-fin/modular-wallets-core");
   const { toWebAuthnAccount } = await import("viem/account-abstraction");
 
@@ -76,7 +106,10 @@ async function connectPasskey(mode: "register" | "login", username?: string): Pr
       ? JSON.parse(saved)
       : await mw.toWebAuthnCredential({
           transport: mw.toPasskeyTransport(CLIENT_URL, CLIENT_KEY),
-          mode: mode === "register" ? mw.WebAuthnMode.Register : mw.WebAuthnMode.Login,
+          mode:
+            mode === "register"
+              ? mw.WebAuthnMode.Register
+              : mw.WebAuthnMode.Login,
           username,
         });
   try {
@@ -85,24 +118,38 @@ async function connectPasskey(mode: "register" | "login", username?: string): Pr
     // not persisted; the passkey still works next time via "login"
   }
   // The Circle SDK bundles its own viem copy; the casts bridge the duplicate type identities.
-  const transport = mw.toModularTransport(`${CLIENT_URL}/${CHAIN_PATH}`, CLIENT_KEY) as unknown as Transport;
+  const transport = mw.toModularTransport(
+    `${CLIENT_URL}/${CHAIN_PATH}`,
+    CLIENT_KEY,
+  ) as unknown as Transport;
   const client = createPublicClient({ chain: CHAIN, transport });
   type SmartAccountParams = Parameters<typeof mw.toCircleSmartAccount>[0];
   const account = await mw.toCircleSmartAccount({
     client: client as unknown as SmartAccountParams["client"],
-    owner: toWebAuthnAccount({ credential }) as unknown as SmartAccountParams["owner"],
+    owner: toWebAuthnAccount({
+      credential,
+    }) as unknown as SmartAccountParams["owner"],
   });
   return { address: account.address, kind: "passkey" };
 }
 
 async function usdcBalance(address: `0x${string}`) {
-  const client = createPublicClient({ chain: CHAIN, transport: http() });
+  const client = publicClient(CHAIN);
   // Arc exposes native USDC through an ERC-20 interface with 6 decimals.
-  const raw = await client.readContract({ address: USDC, abi: [parseAbiItem("function balanceOf(address) view returns (uint256)")], functionName: "balanceOf", args: [address] });
+  const raw = await client.readContract({
+    address: USDC,
+    abi: [parseAbiItem("function balanceOf(address) view returns (uint256)")],
+    functionName: "balanceOf",
+    args: [address],
+  });
   return Number(formatUnits(raw, 6));
 }
 
-export function HoldfastWallet({ onReady }: { onReady: (h: Holdfast) => void }) {
+export function HoldfastWallet({
+  onReady,
+}: {
+  onReady: (h: Holdfast) => void;
+}) {
   const [username, setUsername] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -111,7 +158,9 @@ export function HoldfastWallet({ onReady }: { onReady: (h: Holdfast) => void }) 
 
   useEffect(() => {
     if (!holdfast) return;
-    usdcBalance(holdfast.address).then(setBalance).catch(() => setBalance(null));
+    usdcBalance(holdfast.address)
+      .then(setBalance)
+      .catch(() => setBalance(null));
   }, [holdfast]);
 
   const run = async (label: string, fn: () => Promise<Holdfast>) => {
@@ -131,10 +180,18 @@ export function HoldfastWallet({ onReady }: { onReady: (h: Holdfast) => void }) 
   if (holdfast) {
     return (
       <div className="rounded-md border border-ink bg-surface-2 p-4">
-        <p className="text-sm text-muted">{holdfast.kind === "passkey" ? "Circle passkey wallet" : "Browser wallet"} · {CHAIN.name}</p>
+        <p className="text-sm text-muted">
+          {holdfast.kind === "passkey"
+            ? "Circle passkey wallet"
+            : "Browser wallet"}{" "}
+          · {CHAIN.name}
+        </p>
         <p className="mt-1 break-all font-mono text-sm">{holdfast.address}</p>
         <p className="mt-2 text-sm text-ink-2">
-          USDC balance: <span className="font-mono">{balance === null ? "…" : balance.toFixed(2)}</span>
+          USDC balance:{" "}
+          <span className="font-mono">
+            {balance === null ? "…" : balance.toFixed(2)}
+          </span>
         </p>
       </div>
     );
@@ -143,7 +200,11 @@ export function HoldfastWallet({ onReady }: { onReady: (h: Holdfast) => void }) 
   return (
     <div className="space-y-5">
       <div>
-        <button className="btn btn-primary" disabled={busy !== null} onClick={() => run("browser", connectBrowser)}>
+        <button
+          className="btn btn-primary"
+          disabled={busy !== null}
+          onClick={() => run("browser", connectBrowser)}
+        >
           {busy === "browser" ? "Check your wallet…" : "Connect wallet"}
         </button>
       </div>
@@ -156,7 +217,11 @@ export function HoldfastWallet({ onReady }: { onReady: (h: Holdfast) => void }) 
           <input
             id="hf-name"
             value={username}
-            onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32))}
+            onChange={(e) =>
+              setUsername(
+                e.target.value.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32),
+              )
+            }
             placeholder="passkey name, e.g. tidepool-ana"
             className="w-full field px-4 py-2.5"
           />
@@ -164,11 +229,19 @@ export function HoldfastWallet({ onReady }: { onReady: (h: Holdfast) => void }) 
             <button
               className="btn btn-ghost"
               disabled={busy !== null || !username}
-              onClick={() => run("register", () => connectPasskey("register", username))}
+              onClick={() =>
+                run("register", () => connectPasskey("register", username))
+              }
             >
-              {busy === "register" ? "Waiting for passkey…" : "Create passkey wallet"}
+              {busy === "register"
+                ? "Waiting for passkey…"
+                : "Create passkey wallet"}
             </button>
-            <button className="btn btn-ghost" disabled={busy !== null} onClick={() => run("login", () => connectPasskey("login"))}>
+            <button
+              className="btn btn-ghost"
+              disabled={busy !== null}
+              onClick={() => run("login", () => connectPasskey("login"))}
+            >
               {busy === "login" ? "Waiting for passkey…" : "I already have one"}
             </button>
           </div>

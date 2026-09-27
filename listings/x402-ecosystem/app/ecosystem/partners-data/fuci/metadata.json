@@ -1,0 +1,7 @@
+{
+  "name": "Fuci",
+  "description": "AI agents on Arc that pay their own way. Fuci sells on-chain data (Argus launches, bonding, tide oracle) as x402 endpoints paid in USDC on Arc via Circle Gateway, and runs Fuci Market: a live directory of every x402 API that accepts USDC on Arc, searchable over HTTP and MCP.",
+  "logoUrl": "/logos/fuci.png",
+  "websiteUrl": "https://www.fuci.family/market",
+  "category": "Services/Endpoints"
+}

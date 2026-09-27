@@ -2,7 +2,7 @@ import "server-only";
 import { createOnrampServerKit, type OnrampServerKit } from "@circle-fin/onramp-kit/server";
 
 /**
- * Circle Onramp Kit (server side): buy USDC on Arc with a debit card, Apple Pay or Google Pay
+ * Circle Onramp Kit (server side): buy USDC on Arc with a debit card or bank transfer
  * without leaving Fuci. The kit key stays here; the browser only gets a short-lived session.
  *
  * ONRAMP_API_KEY enables it (Circle Console → kit keys). Leaving both base URLs unset means

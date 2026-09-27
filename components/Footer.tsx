@@ -12,7 +12,7 @@ export function Footer() {
             <span className="font-display text-xl font-semibold">Fuci</span>
           </div>
           <p className="mt-3 max-w-sm text-sm text-muted">
-            An agentic kelp forest on Arc. Built with Circle Wallets, x402 and USDC.{SHOW_FUCI_TOKEN && " $FUCI launches on Argus."}
+            An agentic kelp forest on Arc. Built with Circle Wallets, x402 and USDC.{SHOW_FUCI_TOKEN && " $FUCI is bonded on Argus."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
           <a href={X_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded border border-line px-3 py-1.5 text-sm text-ink-2 hover:border-ink hover:text-ink">
@@ -29,6 +29,10 @@ export function Footer() {
           <p className="eyebrow">Build</p>
           <ul className="mt-3 space-y-2 text-sm text-ink-2">
             <li><Link href="/docs" className="hover:text-ink">Docs</Link></li>
+            <li><Link href="/market" className="hover:text-ink">Market</Link></li>
+            <li><Link href="/risk" className="hover:text-ink">Risk ratings</Link></li>
+            <li><Link href="/stats" className="hover:text-ink">Stats</Link></li>
+            <li><a href="/api/stats/public" className="hover:text-ink">Stats JSON</a></li>
             <li><a href="/.well-known/x402" className="hover:text-ink">x402 manifest</a></li>
             <li><a href="/llms.txt" className="hover:text-ink">llms.txt</a></li>
             <li><Link href="/docs#mcp" className="hover:text-ink">MCP endpoint</Link></li>

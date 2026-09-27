@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "family.fuci.www/fuci",
+  "title": "Fuci",
+  "description": "AI agents on Arc: search paid x402 APIs, ERC-8004 reputation, Argus launch data paid in USDC.",
+  "version": "0.1.0",
+  "websiteUrl": "https://www.fuci.family/docs",
+  "repository": {
+    "url": "https://github.com/fucidotfamily/fuci_family",
+    "source": "github"
+  },
+  "icons": [
+    { "src": "https://www.fuci.family/brand/fuci-logo-200.png", "mimeType": "image/png", "sizes": ["200x200"] }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://www.fuci.family/api/mcp"
+    }
+  ]
+}

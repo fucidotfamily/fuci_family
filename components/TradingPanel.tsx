@@ -68,26 +68,70 @@ function N({ value, onChange, w = "w-16", step = 1, label }: { value: number; on
   );
 }
 
-function Row({ on, set, children }: { on: boolean; set: (on: boolean) => void; children: React.ReactNode }) {
+function Row({ on, set, hint, children }: { on: boolean; set: (on: boolean) => void; hint: string; children: React.ReactNode }) {
   return (
-    <li className={`flex items-start gap-3 rounded border px-3 py-2 text-sm ${on ? "border-ink/60" : "border-line text-ink-2"}`}>
+    <li className={`flex items-start gap-3 rounded-md border px-3 py-2.5 text-sm ${on ? "border-ink/60" : "border-line text-ink-2"}`}>
       <input type="checkbox" checked={on} onChange={(e) => set(e.target.checked)} className="mt-1.5 size-4 shrink-0 accent-current" />
-      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1">{children}</span>
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">{children}</span>
+        <span className="mt-0.5 block text-xs text-muted">{hint}</span>
+      </span>
     </li>
   );
 }
 
-function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+function Step({ n, title, hint, children }: { n: number; title: string; hint?: string; children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[1.75rem_1fr] gap-3 border-t border-line pt-5 first:border-t-0 first:pt-0">
       <span className="flex size-7 items-center justify-center rounded-full border border-ink font-mono text-xs">{n}</span>
       <div className="min-w-0">
         <p className="font-semibold">{title}</p>
+        {hint && <p className="mt-0.5 text-sm text-ink-2">{hint}</p>}
         {children}
       </div>
     </div>
   );
 }
+
+/** One-tap starting points; every value stays editable below. */
+const PRESETS: { id: string; label: string; body: string; apply: (f: Form) => Form }[] = [
+  {
+    id: "careful",
+    label: "Careful",
+    body: "Only buys tokens that already bonded. Small amounts, quick exits.",
+    apply: (f) => ({
+      ...f,
+      snipe: { ...f.snipe, on: false },
+      grad: { on: true, usdc: 1 },
+      tp: { on: true, pct: 50, sellPct: 50 },
+      sl: { on: true, pct: 30 },
+      dev: { on: true },
+      perTradeUsdc: 1,
+      dailyUsdc: 5,
+    }),
+  },
+  {
+    id: "bold",
+    label: "Bold",
+    body: "Also buys brand-new launches. Higher risk, higher reward.",
+    apply: (f) => ({
+      ...f,
+      snipe: { on: true, usdc: 1 },
+      grad: { on: true, usdc: 1 },
+      tp: { on: true, pct: 100, sellPct: 50 },
+      sl: { on: true, pct: 50 },
+      dev: { on: true },
+      perTradeUsdc: 2,
+      dailyUsdc: 10,
+    }),
+  },
+];
+
+const GUIDE = [
+  "Add USDC to your agent's own wallet. Only you can take it out.",
+  "Pick a strategy. Your agent watches Argus, the token launchpad on Arc, every 5 minutes.",
+  "Turn it on. It buys and sells by itself, never above your daily limit.",
+];
 
 /** Owner-only: fund the agent, pick what it trades, turn it on. */
 export function Autopilot({ ops }: { ops: TradingOps }) {
@@ -107,69 +151,125 @@ export function Autopilot({ ops }: { ops: TradingOps }) {
   const total = state.positions.reduce((s, p) => s + (p.valueUsdc ?? 0), 0);
   const orders = (state.trading?.rules ?? []).filter((r) => (r.kind === "limit-buy" || r.kind === "limit-sell") && !r.done);
   const cancel = (id: string) => ops.save(toSettings(f, savedOrders.filter((o) => o.id !== id)), "orders", "Order cancelled.");
+  const nothingPicked = !f.snipe.on && !f.grad.on && !f.tp.on && !f.sl.on && !f.dev.on;
 
   return (
     <div className="space-y-5">
-      <Step n={1} title="Fund the agent wallet">
+      <details className="rounded-md border border-line bg-surface-2/40 px-4 py-3 text-sm" open={!state.trading}>
+        <summary className="cursor-pointer font-semibold">How autopilot works</summary>
+        <ol className="mt-2 list-decimal space-y-1 pl-5 text-ink-2">
+          {GUIDE.map((g) => (
+            <li key={g}>{g}</li>
+          ))}
+        </ol>
+        <p className="mt-2 text-xs text-muted">
+          Fuci takes {TRADE_FEE_PCT}% per trade. New tokens are risky and can go to zero: only use money you can afford to lose.
+        </p>
+      </details>
+
+      <Step n={1} title="Add USDC" hint="Your agent trades with this balance and pays its gas from it.">
         {wallet ? (
           <>
-            <p className="mt-1 text-sm text-ink-2">Send USDC on Arc to this address, use Fund below, or buy USDC with a card, Apple Pay or Google Pay. It pays for trades and gas. Only you can withdraw, anytime: USDC and tokens go back to your wallet.</p>
-            <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-line px-3 py-2">
-              <a className="min-w-0 break-all font-mono text-sm underline" href={wallet.explorer} target="_blank" rel="noreferrer">
-                {wallet.address}
-              </a>
-              <CopyButton text={wallet.address} />
-              <span className="ml-auto font-mono text-sm">{wallet.walletUsdc === null ? "…" : wallet.walletUsdc.toFixed(2)} USDC</span>
+            <div className="mt-3 flex flex-wrap items-end justify-between gap-3 rounded-md border border-line px-4 py-3">
+              <div>
+                <p className="text-xs text-muted">Agent balance</p>
+                <p className="font-display text-3xl font-semibold tabular-nums">
+                  {wallet.walletUsdc === null ? "…" : wallet.walletUsdc.toFixed(2)} <span className="text-base font-normal text-ink-2">USDC</span>
+                </p>
+              </div>
+              <div className="flex min-w-0 items-center gap-2 font-mono text-xs text-ink-2">
+                <a className="truncate underline" href={wallet.explorer} target="_blank" rel="noreferrer" title={wallet.address}>
+                  {wallet.address.slice(0, 8)}…{wallet.address.slice(-6)}
+                </a>
+                <CopyButton text={wallet.address} />
+              </div>
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <N value={fund} onChange={setFund} w="w-20" label="USDC to send" />
-              <button className="btn btn-ghost !py-1.5" disabled={busy !== null || !(fund > 0)} onClick={() => ops.fund(fund)}>
-                {busy === "fund" ? "Check your wallet…" : "Fund"}
+              <button className="btn btn-primary !py-1.5" disabled={busy !== null || !(fund > 0)} onClick={() => ops.fund(fund)}>
+                {busy === "fund" ? "Check your wallet…" : "Add from my wallet"}
               </button>
-              <button className="btn btn-ghost !py-1.5" disabled={busy !== null} onClick={ops.withdraw}>
-                {busy === "withdraw" ? "Withdrawing…" : "Withdraw all"}
-              </button>
-              <BuyUsdc target={{ agentId: ops.agentId }} onSettled={() => void ops.load()} />
+              <BuyUsdc target={{ agentId: ops.agentId }} label="Buy with card / bank" onSettled={() => void ops.load()} />
             </div>
+            <p className="mt-2 text-xs text-muted">
+              Or send USDC on Arc to the address above.{" "}
+              <button className="underline hover:text-ink" disabled={busy !== null} onClick={ops.withdraw}>
+                {busy === "withdraw" ? "Withdrawing…" : "Withdraw everything"}
+              </button>{" "}
+              back to your wallet anytime.
+            </p>
           </>
         ) : (
           <p className="mt-1 text-sm text-muted">Creating the agent wallet…</p>
         )}
-        {wallet && <p className="mt-2 text-xs text-muted">Buys stop at your daily max ({f.dailyUsdc} USDC a day, set in step 2), whatever the balance.</p>}
         {msg("wallet")}
       </Step>
 
-      <Step n={2} title="Pick what it does">
+      <Step n={2} title="Choose a strategy" hint="Start from a preset, then tick or untick anything.">
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {PRESETS.map((p) => (
+            <button key={p.id} type="button" onClick={() => setForm(p.apply(f))} className="rounded-md border border-line p-3 text-left hover:border-ink">
+              <span className="font-semibold">{p.label}</span>
+              <span className="mt-0.5 block text-xs text-ink-2">{p.body}</span>
+            </button>
+          ))}
+        </div>
+        <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-muted">When to buy</p>
         <ul className="mt-2 space-y-2">
-          <Row on={f.snipe.on} set={(on) => set({ snipe: { ...f.snipe, on } })}>
-            Buy every new Argus launch, spend <N value={f.snipe.usdc} step={0.5} label="USDC per new launch" onChange={(usdc) => set({ snipe: { ...f.snipe, usdc } })} /> USDC
+          <Row on={f.grad.on} set={(on) => set({ grad: { ...f.grad, on } })} hint="A token bonds when enough people buy it. Safer than brand-new launches.">
+            Buy tokens that just bonded, <N value={f.grad.usdc} step={0.5} label="USDC per bonding" onChange={(usdc) => set({ grad: { ...f.grad, usdc } })} /> USDC each
           </Row>
-          <Row on={f.grad.on} set={(on) => set({ grad: { ...f.grad, on } })}>
-            Buy when a token bonds, spend <N value={f.grad.usdc} step={0.5} label="USDC per bonding" onChange={(usdc) => set({ grad: { ...f.grad, usdc } })} /> USDC
+          <Row on={f.snipe.on} set={(on) => set({ snipe: { ...f.snipe, on } })} hint="Buys every new token right after it launches on Argus. Riskiest, biggest upside.">
+            Buy new launches, <N value={f.snipe.usdc} step={0.5} label="USDC per new launch" onChange={(usdc) => set({ snipe: { ...f.snipe, usdc } })} /> USDC each
           </Row>
-          {(f.snipe.on || f.grad.on) && (
-            <li className="flex flex-wrap items-center gap-1.5 px-3 text-xs text-ink-2">
-              Skip tokens with a buy tax above <N value={f.maxTax} w="w-14" step={0.5} label="Max buy tax percent" onChange={(maxTax) => set({ maxTax })} />% (Argus tokens set their own
-              1–10% tax)
-            </li>
-          )}
-          <Row on={f.tp.on} set={(on) => set({ tp: { ...f.tp, on } })}>
+        </ul>
+        <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-muted">When to sell</p>
+        <ul className="mt-2 space-y-2">
+          <Row on={f.tp.on} set={(on) => set({ tp: { ...f.tp, on } })} hint="Locks in gains automatically.">
             Take profit: when up <N value={f.tp.pct} step={10} label="Percent up" onChange={(pct) => set({ tp: { ...f.tp, pct } })} />%, sell{" "}
             <N value={f.tp.sellPct} step={10} label="Percent to sell" onChange={(sellPct) => set({ tp: { ...f.tp, sellPct } })} />%
           </Row>
-          <Row on={f.sl.on} set={(on) => set({ sl: { ...f.sl, on } })}>
+          <Row on={f.sl.on} set={(on) => set({ sl: { ...f.sl, on } })} hint="Limits the loss if the price falls.">
             Stop loss: when down <N value={f.sl.pct} step={5} label="Percent down" onChange={(pct) => set({ sl: { ...f.sl, pct } })} />%, sell all
           </Row>
-          <Row on={f.dev.on} set={(on) => set({ dev: { on } })}>
-            Sell all when the token&apos;s dev sells
+          <Row on={f.dev.on} set={(on) => set({ dev: { on } })} hint="If the token's creator sells, your agent gets out too.">
+            Sell when the token&apos;s creator sells
           </Row>
         </ul>
-        <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-ink-2">
-          Limits: <N value={f.perTradeUsdc} step={0.5} label="Max USDC per trade" onChange={(perTradeUsdc) => set({ perTradeUsdc })} /> USDC per trade ·{" "}
-          <N value={f.dailyUsdc} label="Max USDC of buys per day" onChange={(dailyUsdc) => set({ dailyUsdc })} /> USDC per day · slippage{" "}
-          <N value={f.slippagePct} w="w-14" label="Slippage percent" onChange={(slippagePct) => set({ slippagePct })} />%
-        </p>
-        <p className="mt-1 text-xs text-muted">To trade one token (buy now, limit buy, limit sell), paste its address in the box above.</p>
+
+        <details className="mt-4 text-sm">
+          <summary className="cursor-pointer text-ink-2 hover:text-ink">Advanced: limits and slippage</summary>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="flex items-center justify-between gap-2 rounded-md border border-line px-3 py-2">
+              <span>Max per trade</span>
+              <span className="flex items-center gap-1.5">
+                <N value={f.perTradeUsdc} step={0.5} label="Max USDC per trade" onChange={(perTradeUsdc) => set({ perTradeUsdc })} /> USDC
+              </span>
+            </label>
+            <label className="flex items-center justify-between gap-2 rounded-md border border-line px-3 py-2">
+              <span>Max buys per day</span>
+              <span className="flex items-center gap-1.5">
+                <N value={f.dailyUsdc} label="Max USDC of buys per day" onChange={(dailyUsdc) => set({ dailyUsdc })} /> USDC
+              </span>
+            </label>
+            <label className="flex items-center justify-between gap-2 rounded-md border border-line px-3 py-2">
+              <span>Slippage</span>
+              <span className="flex items-center gap-1.5">
+                <N value={f.slippagePct} w="w-14" label="Slippage percent" onChange={(slippagePct) => set({ slippagePct })} />%
+              </span>
+            </label>
+            <label className="flex items-center justify-between gap-2 rounded-md border border-line px-3 py-2">
+              <span>Skip buy tax above</span>
+              <span className="flex items-center gap-1.5">
+                <N value={f.maxTax} w="w-14" step={0.5} label="Max buy tax percent" onChange={(maxTax) => set({ maxTax })} />%
+              </span>
+            </label>
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            Slippage is how much worse than the quoted price a trade may fill. Argus tokens set their own 1–10% buy tax. To trade one token by hand (buy now, limit buy, limit
+            sell), paste its address in the box above.
+          </p>
+        </details>
         {orders.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {orders.map((o) =>
@@ -188,18 +288,30 @@ export function Autopilot({ ops }: { ops: TradingOps }) {
       </Step>
 
       <Step n={3} title="Turn it on">
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <button className={`tab ${f.enabled ? "tab-active" : ""}`} aria-pressed={f.enabled} disabled={busy !== null} onClick={() => save(!f.enabled)}>
-            {busy === "save" ? "…" : f.enabled ? "On" : "Off"}
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button
+            className={`btn !py-2.5 ${f.enabled ? "btn-ghost" : "btn-primary"}`}
+            disabled={busy !== null || (!f.enabled && nothingPicked)}
+            onClick={() => save(!f.enabled)}
+          >
+            {busy === "save" ? "Saving…" : f.enabled ? "■ Stop autopilot" : "▶ Start autopilot"}
           </button>
-          <button className="btn btn-primary !py-2" disabled={busy !== null} onClick={() => save()}>
-            {busy === "save" ? "Saving…" : "Save"}
-          </button>
+          {form && (
+            <button className="btn btn-ghost !py-2.5" disabled={busy !== null} onClick={() => save()}>
+              Save changes
+            </button>
+          )}
+          <span className={`flex items-center gap-2 font-mono text-xs ${f.enabled ? "text-up" : "text-muted"}`}>
+            <span className={`size-2 rounded-full ${f.enabled ? "bg-up" : "bg-line"}`} />
+            {f.enabled ? "Running" : "Off"}
+          </span>
         </div>
         <p className="mt-2 text-xs text-muted">
           {state.trading?.pausedReason
             ? `Note: ${state.trading.pausedReason}`
-            : `Checks every 5 minutes · bought today ${state.spentToday.toFixed(2)}/${f.dailyUsdc} USDC · ${TRADE_FEE_PCT}% fee per trade · memecoins can go to zero.`}
+            : nothingPicked
+              ? "Pick at least one rule in step 2 first."
+              : `Checks every 5 minutes · bought today ${state.spentToday.toFixed(2)} of ${f.dailyUsdc} USDC.`}
         </p>
         {msg("autopilot")}
       </Step>

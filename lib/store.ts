@@ -31,7 +31,14 @@ export type AgentCard = {
   /** Set when it was created on-chain through the Fuci factory (1 USDC). */
   createdVia?: "factory";
   /** Verified X account, from X's OAuth login (no tokens are kept). */
-  x?: { id: string; username: string; name: string; avatar: string | null; verified: boolean; connectedAt: number };
+  x?: {
+    id: string;
+    username: string;
+    name: string;
+    avatar: string | null;
+    verified: boolean;
+    connectedAt: number;
+  };
   /** Set (to the upload time) when the owner uploaded a profile image. */
   image?: number;
   /** The agent's own wallet (key held encrypted by the server, see lib/agentWallets.ts). */
@@ -58,7 +65,9 @@ export type Automation = {
 export type { Trading, TradeRule } from "./tradingRules";
 import type { Trading } from "./tradingRules";
 
-export const AUTOMATION_INTERVALS = [5, 15, 30, 60, 180, 360, 720, 1440] as const;
+export const AUTOMATION_INTERVALS = [
+  5, 15, 30, 60, 180, 360, 720, 1440,
+] as const;
 
 export type TideEvent = {
   at: number;
@@ -80,7 +89,8 @@ export type Stats = {
 };
 
 const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
-const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+const token =
+  process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
 const redis = url && token ? new Redis({ url, token }) : null;
 export const PERSISTENT = Boolean(redis);
 
@@ -104,15 +114,37 @@ const K = {
   list: (key: string) => `fuci:v2:list:${key}`,
 };
 
-type Mem = { calls: number; usdcMicro: number; launches: number; events: TideEvent[]; agents: Map<string, AgentCard>; kv: Map<string, number>; json: Map<string, unknown>; lists: Map<string, string[]> };
+type Mem = {
+  calls: number;
+  usdcMicro: number;
+  launches: number;
+  events: TideEvent[];
+  agents: Map<string, AgentCard>;
+  kv: Map<string, number>;
+  json: Map<string, unknown>;
+  lists: Map<string, string[]>;
+};
 const g = globalThis as unknown as { __fuciMem?: Mem };
-const mem: Mem = g.__fuciMem ?? (g.__fuciMem = { calls: 0, usdcMicro: 0, launches: 0, events: [], agents: new Map(), kv: new Map(), json: new Map(), lists: new Map() });
+const mem: Mem =
+  g.__fuciMem ??
+  (g.__fuciMem = {
+    calls: 0,
+    usdcMicro: 0,
+    launches: 0,
+    events: [],
+    agents: new Map(),
+    kv: new Map(),
+    json: new Map(),
+    lists: new Map(),
+  });
 mem.json ??= new Map();
 mem.lists ??= new Map();
 
-const parse = <T>(v: T | string) => (typeof v === "string" ? (JSON.parse(v) as T) : v);
+const parse = <T>(v: T | string) =>
+  typeof v === "string" ? (JSON.parse(v) as T) : v;
 /** Skips name reservations that have not been filled yet. */
-const isAgent = (a: AgentCard) => Boolean(a && a.owner && !(a as { reserved?: boolean }).reserved);
+const isAgent = (a: AgentCard) =>
+  Boolean(a && a.owner && !(a as { reserved?: boolean }).reserved);
 
 // ---------------------------------------------------------------------------
 
@@ -180,15 +212,23 @@ export async function agentOf(owner: string): Promise<AgentCard | null> {
     let id = await redis.hget<string>(K.owners, key);
     if (!id) {
       // Backfill for fronds spawned before the owner index existed: the oldest one wins.
-      const all = ((await redis.hvals(K.agents)) as (AgentCard | string)[]).map(parse).filter(isAgent);
-      const mine = all.filter((a) => a.owner.toLowerCase() === key).sort((a, b) => a.createdAt - b.createdAt)[0];
+      const all = ((await redis.hvals(K.agents)) as (AgentCard | string)[])
+        .map(parse)
+        .filter(isAgent);
+      const mine = all
+        .filter((a) => a.owner.toLowerCase() === key)
+        .sort((a, b) => a.createdAt - b.createdAt)[0];
       if (!mine) return null;
       await redis.hsetnx(K.owners, key, mine.id);
       id = (await redis.hget<string>(K.owners, key)) ?? mine.id;
     }
     return getAgent(String(id));
   }
-  return [...mem.agents.values()].filter((a) => a.owner.toLowerCase() === key).sort((a, b) => a.createdAt - b.createdAt)[0] ?? null;
+  return (
+    [...mem.agents.values()]
+      .filter((a) => a.owner.toLowerCase() === key)
+      .sort((a, b) => a.createdAt - b.createdAt)[0] ?? null
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +236,14 @@ export async function agentOf(owner: string): Promise<AgentCard | null> {
 
 /** Atomically claim a name for a new agent. False when another agent has it. */
 export async function claimName(id: string) {
-  if (redis) return (await redis.hsetnx(K.agents, id, JSON.stringify({ id, reserved: true }))) === 1;
+  if (redis)
+    return (
+      (await redis.hsetnx(
+        K.agents,
+        id,
+        JSON.stringify({ id, reserved: true }),
+      )) === 1
+    );
   return !mem.agents.has(id);
 }
 
@@ -205,13 +252,22 @@ export async function claimName(id: string) {
  * name when it is free and the agent has no ERC-8004 identity yet (whose card URL
  * is on-chain); the old id then redirects.
  */
-export async function resolveAgent(id: string): Promise<{ agent: AgentCard | null; redirect?: string }> {
+export async function resolveAgent(
+  id: string,
+): Promise<{ agent: AgentCard | null; redirect?: string }> {
   const target = redis ? await redis.hget<string>(K.aliases, id) : null;
-  if (target) return { agent: await getAgent(String(target)), redirect: String(target) };
+  if (target)
+    return { agent: await getAgent(String(target)), redirect: String(target) };
   const a = await getAgent(id);
   if (!a || !redis) return { agent: a };
   const slug = slugOf(a.name, a.owner);
-  if (!/-[0-9a-f]{6}$/.test(a.id) || a.erc8004Id !== undefined || !slug || slug === a.id) return { agent: a };
+  if (
+    !/-[0-9a-f]{6}$/.test(a.id) ||
+    a.erc8004Id !== undefined ||
+    !slug ||
+    slug === a.id
+  )
+    return { agent: a };
   if (!(await claimName(slug))) return { agent: a };
   const moved: AgentCard = { ...a, id: slug };
   await saveAgent(moved);
@@ -227,7 +283,8 @@ export async function resolveAgent(id: string): Promise<{ agent: AgentCard | nul
 
 /** Atomically reserve `owner` for agent `id`. False when the wallet already has an agent. */
 export async function claimOwner(owner: string, id: string) {
-  if (redis) return (await redis.hsetnx(K.owners, owner.toLowerCase(), id)) === 1;
+  if (redis)
+    return (await redis.hsetnx(K.owners, owner.toLowerCase(), id)) === 1;
   return !(await agentOf(owner));
 }
 
@@ -263,7 +320,10 @@ export async function getStats(): Promise<Stats> {
   };
 }
 
-const rank = (list: AgentCard[]) => [...list].sort((a, b) => b.spentUsdc - a.spentUsdc || b.calls - a.calls).slice(0, 8);
+const rank = (list: AgentCard[]) =>
+  [...list]
+    .sort((a, b) => b.spentUsdc - a.spentUsdc || b.calls - a.calls)
+    .slice(0, 8);
 
 // ---------------------------------------------------------------------------
 // Rate limits + the sponsored playground budget (shared across instances via Redis)
@@ -331,7 +391,12 @@ export async function kvGet<T>(key: string): Promise<T | null> {
 }
 
 export async function kvSet(key: string, value: unknown, ttlSec?: number) {
-  if (redis) await redis.set(K.kv(key), JSON.stringify(value), ttlSec ? { ex: ttlSec } : undefined);
+  if (redis)
+    await redis.set(
+      K.kv(key),
+      JSON.stringify(value),
+      ttlSec ? { ex: ttlSec } : undefined,
+    );
   else mem.json.set(key, value);
 }
 
@@ -355,7 +420,9 @@ export async function listPush(key: string, id: string, max = 200) {
  * returned as they come; plain strings are parsed, and anything unreadable is skipped.
  */
 export async function listRangeJson<T>(key: string, n = 50): Promise<T[]> {
-  const raw: unknown[] = redis ? ((await redis.lrange<unknown>(K.list(key), 0, n - 1)) ?? []) : (mem.lists.get(key) ?? []).slice(0, n);
+  const raw: unknown[] = redis
+    ? ((await redis.lrange<unknown>(K.list(key), 0, n - 1)) ?? [])
+    : (mem.lists.get(key) ?? []).slice(0, n);
   return raw.flatMap((r) => {
     if (r && typeof r === "object") return [r as T];
     if (typeof r !== "string") return [];
@@ -368,7 +435,10 @@ export async function listRangeJson<T>(key: string, n = 50): Promise<T[]> {
 }
 
 export async function listRange(key: string, n = 50): Promise<string[]> {
-  if (redis) return ((await redis.lrange<string | number>(K.list(key), 0, n - 1)) ?? []).map(String);
+  if (redis)
+    return (
+      (await redis.lrange<string | number>(K.list(key), 0, n - 1)) ?? []
+    ).map(String);
   return (mem.lists.get(key) ?? []).slice(0, n);
 }
 
@@ -377,14 +447,24 @@ export async function listRange(key: string, n = 50): Promise<string[]> {
 
 export type HistoryEvent = {
   at: number;
-  kind: "spawn" | "run" | "payment" | "identity" | "validation" | "profile" | "trade";
+  kind:
+    | "spawn"
+    | "run"
+    | "payment"
+    | "identity"
+    | "validation"
+    | "profile"
+    | "trade";
   label: string;
   usdc?: number;
   /** Explorer link for the on-chain transaction, when there is one. */
   href?: string;
 };
 
-export async function pushHistory(agentId: string, e: Omit<HistoryEvent, "at"> & { at?: number }) {
+export async function pushHistory(
+  agentId: string,
+  e: Omit<HistoryEvent, "at"> & { at?: number },
+) {
   const ev: HistoryEvent = { at: Date.now(), ...e };
   if (redis) {
     const p = redis.pipeline();
@@ -398,8 +478,13 @@ export async function pushHistory(agentId: string, e: Omit<HistoryEvent, "at"> &
   }
 }
 
-export async function getHistory(agentId: string, n = 100): Promise<HistoryEvent[]> {
-  const raw = redis ? await redis.lrange<HistoryEvent | string>(K.history(agentId), 0, n - 1) : (mem.lists.get(`history:${agentId}`) ?? []).slice(0, n);
+export async function getHistory(
+  agentId: string,
+  n = 100,
+): Promise<HistoryEvent[]> {
+  const raw = redis
+    ? await redis.lrange<HistoryEvent | string>(K.history(agentId), 0, n - 1)
+    : (mem.lists.get(`history:${agentId}`) ?? []).slice(0, n);
   return (raw ?? []).map((r) => parse<HistoryEvent>(r));
 }
 
@@ -417,7 +502,14 @@ export async function unscheduleAgent(agentId: string) {
 }
 
 export async function dueAgents(now: number, limit: number): Promise<string[]> {
-  if (redis) return ((await redis.zrange(K.auto, 0, now, { byScore: true, offset: 0, count: limit })) as unknown[]).map(String);
+  if (redis)
+    return (
+      (await redis.zrange(K.auto, 0, now, {
+        byScore: true,
+        offset: 0,
+        count: limit,
+      })) as unknown[]
+    ).map(String);
   return [...mem.json.entries()]
     .filter(([k, v]) => k.startsWith("auto:") && Number(v) <= now)
     .sort((a, b) => Number(a[1]) - Number(b[1]))
@@ -433,21 +525,28 @@ export async function spentToday(agentId: string) {
 
 export async function addSpend(agentId: string, usdc: number) {
   const micro = Math.round(usdc * 1e6);
-  if (micro > 0) await incrWithTtl(K.spend(agentId, today()), micro, 60 * 60 * 26);
+  if (micro > 0)
+    await incrWithTtl(K.spend(agentId, today()), micro, 60 * 60 * 26);
 }
 
 // ---------------------------------------------------------------------------
 // Trading: which agents trade, what each bought today, and Fuci's trade fees (micro-USDC).
 
 export async function setTradingActive(agentId: string, on: boolean) {
-  if (redis) await (on ? redis.sadd(K.trading, agentId) : redis.srem(K.trading, agentId));
+  if (redis)
+    await (on
+      ? redis.sadd(K.trading, agentId)
+      : redis.srem(K.trading, agentId));
   else if (on) mem.json.set(`trading:${agentId}`, 1);
   else mem.json.delete(`trading:${agentId}`);
 }
 
 export async function tradingAgents(): Promise<string[]> {
-  if (redis) return ((await redis.smembers(K.trading)) as unknown[]).map(String);
-  return [...mem.json.keys()].filter((k) => k.startsWith("trading:")).map((k) => k.slice(8));
+  if (redis)
+    return ((await redis.smembers(K.trading)) as unknown[]).map(String);
+  return [...mem.json.keys()]
+    .filter((k) => k.startsWith("trading:"))
+    .map((k) => k.slice(8));
 }
 
 export async function tradeSpentToday(agentId: string) {
@@ -458,7 +557,8 @@ export async function tradeSpentToday(agentId: string) {
 
 export async function addTradeSpend(agentId: string, usdc: number) {
   const micro = Math.round(usdc * 1e6);
-  if (micro > 0) await incrWithTtl(K.tradeSpend(agentId, today()), micro, 60 * 60 * 26);
+  if (micro > 0)
+    await incrWithTtl(K.tradeSpend(agentId, today()), micro, 60 * 60 * 26);
 }
 
 export async function addTradeFee(usdc: number) {
@@ -469,14 +569,17 @@ export async function addTradeFee(usdc: number) {
 }
 
 export async function tradeFeesTotal() {
-  const v = redis ? await redis.get<number>(K.tradeFees) : mem.kv.get(K.tradeFees);
+  const v = redis
+    ? await redis.get<number>(K.tradeFees)
+    : mem.kv.get(K.tradeFees);
   return Number(v ?? 0) / 1e6;
 }
 
 /** A short-lived lock so overlapping ticks never trade twice. False when someone else holds it. */
 export async function acquireLock(key: string, ttlSec: number) {
   const k = K.kv(`lock:${key}`);
-  if (redis) return (await redis.set(k, Date.now(), { nx: true, ex: ttlSec })) === "OK";
+  if (redis)
+    return (await redis.set(k, Date.now(), { nx: true, ex: ttlSec })) === "OK";
   const until = Number(mem.json.get(k) ?? 0);
   if (until > Date.now()) return false;
   mem.json.set(k, Date.now() + ttlSec * 1000);
@@ -489,9 +592,16 @@ export async function releaseLock(key: string) {
   else mem.json.delete(k);
 }
 
-/** Set `key` only if it is not set yet. True when this call wrote it. */
-export async function kvSetNx(key: string, value: unknown) {
-  if (redis) return (await redis.set(K.kv(key), JSON.stringify(value), { nx: true })) === "OK";
+/** Set `key` only if it is not set yet (optionally expiring). True when this call wrote it. */
+export async function kvSetNx(key: string, value: unknown, ttlSec?: number) {
+  if (redis)
+    return (
+      (await redis.set(
+        K.kv(key),
+        JSON.stringify(value),
+        ttlSec ? { nx: true, ex: ttlSec } : { nx: true },
+      )) === "OK"
+    );
   if (mem.json.has(key)) return false;
   mem.json.set(key, value);
   return true;

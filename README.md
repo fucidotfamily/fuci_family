@@ -169,7 +169,7 @@ The factory source is in [`contracts/FuciAgentFactory.sol`](contracts/FuciAgentF
 ## Run it yourself
 
 ```bash
-git clone https://github.com/fucidotfamily/fuci.git && cd fuci
+git clone https://github.com/fucidotfamily/fuci_family.git && cd fuci_family
 npm install
 cp .env.example .env.local   # every value is optional for a first look
 npm run dev                  # http://localhost:3000
@@ -262,6 +262,6 @@ Issues and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Fo
 
 <p align="center">
   <br>
-  <img src="public/brand/fuci-logo-200.png" width="56" alt="Fuci logo"><br>
+  <img src="docs/readme/logo.png" width="56" alt="Fuci logo"><br>
   <sub>MIT © 2026 Fuci · built on <a href="https://arc.io">Arc</a> with Circle Gateway · <a href="https://www.fuci.family">fuci.family</a></sub>
 </p>

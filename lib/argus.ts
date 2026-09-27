@@ -1,4 +1,17 @@
-import { createPublicClient, encodeAbiParameters, encodeFunctionData, fallback, formatUnits, http, keccak256, parseAbi, parseAbiItem, parseAbiParameters, type Address, type Hex } from "viem";
+import {
+  createPublicClient,
+  encodeAbiParameters,
+  encodeFunctionData,
+  fallback,
+  formatUnits,
+  http,
+  keccak256,
+  parseAbi,
+  parseAbiItem,
+  parseAbiParameters,
+  type Address,
+  type Hex,
+} from "viem";
 import { arc } from "viem/chains";
 
 /**
@@ -17,12 +30,36 @@ export const ARGUS = {
    * record and opens pools with Uniswap v4's dynamic-fee flag instead of a fixed 1% fee.
    */
   portals: [
-    { n: 8, address: "0xeed7559b8a6abf64427dc41cb5cc6400109c5d93", startBlock: 22251798n },
-    { n: 7, address: "0xB021Be536808f551b31789422Fd28a6c9c6e97Da", startBlock: 20395275n },
-    { n: 6, address: "0xA5628A11c412596E1f63b75a2C0284F843C549d6", startBlock: 20240260n },
-    { n: 5, address: "0x07a688a001f416cC433c68Ff56Aa26bC5131Cc6E", startBlock: 20081606n },
-    { n: 4, address: "0xa36c443A797771Df82533B8B4A86F0AFfd970862", startBlock: 19690658n },
-    { n: 3, address: "0x7A17Ab0106C46C0be30623F3EB7F299CC0058338", startBlock: 19674154n },
+    {
+      n: 8,
+      address: "0xeed7559b8a6abf64427dc41cb5cc6400109c5d93",
+      startBlock: 22251798n,
+    },
+    {
+      n: 7,
+      address: "0xB021Be536808f551b31789422Fd28a6c9c6e97Da",
+      startBlock: 20395275n,
+    },
+    {
+      n: 6,
+      address: "0xA5628A11c412596E1f63b75a2C0284F843C549d6",
+      startBlock: 20240260n,
+    },
+    {
+      n: 5,
+      address: "0x07a688a001f416cC433c68Ff56Aa26bC5131Cc6E",
+      startBlock: 20081606n,
+    },
+    {
+      n: 4,
+      address: "0xa36c443A797771Df82533B8B4A86F0AFfd970862",
+      startBlock: 19690658n,
+    },
+    {
+      n: 3,
+      address: "0x7A17Ab0106C46C0be30623F3EB7F299CC0058338",
+      startBlock: 19674154n,
+    },
   ] as const,
   poolManager: "0x8366a39CC670B4001A1121B8F6A443A643e40951",
   stateView: "0xF3334192D15450CdD385c8B70e03f9A6bD9E673b",
@@ -36,7 +73,8 @@ export const ARGUS = {
 const LIVE_PORTALS = ARGUS.portals.slice(1, 3).map((p) => p.address);
 /** Portal #8: launch event `(address indexed token, address indexed creator, hook, splitter, locker, positionId, tickStart, tickBond)`. */
 const PORTAL8 = ARGUS.portals[0].address.toLowerCase();
-const PORTAL8_LAUNCH = "0xc32e25061af0b7f7d77b7fb015333ecb0004127b71abbda4d7ba4c18bcd497f3";
+const PORTAL8_LAUNCH =
+  "0xc32e25061af0b7f7d77b7fb015333ecb0004127b71abbda4d7ba4c18bcd497f3";
 /** Uniswap v4 LPFeeLibrary.DYNAMIC_FEE_FLAG: the hook sets the fee on every swap. */
 export const DYNAMIC_FEE = 0x800000;
 
@@ -55,8 +93,12 @@ export const HOOK = parseAbi([
   "function buyTaxBps() view returns (uint16)",
   "function sellTaxBps() view returns (uint16)",
 ]);
-const STATE_VIEW = parseAbi(["function getSlot0(bytes32 poolId) view returns (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee)"]);
-export const ERC20_BALANCE = parseAbiItem("function balanceOf(address) view returns (uint256)");
+const STATE_VIEW = parseAbi([
+  "function getSlot0(bytes32 poolId) view returns (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee)",
+]);
+export const ERC20_BALANCE = parseAbiItem(
+  "function balanceOf(address) view returns (uint256)",
+);
 const ERC20_SYMBOL = parseAbiItem("function symbol() view returns (string)");
 const ERC20_NAME = parseAbiItem("function name() view returns (string)");
 
@@ -67,11 +109,17 @@ const LOG_WINDOW = 5_000n;
 const USDC_DECIMALS = 6;
 
 // Public Arc RPCs rate-limit bursts, so rotate across all of them (a private RPC goes first).
-const RPC_URLS = [process.env.ARGUS_RPC_URL, process.env.FOCI_RPC_URL, ...arc.rpcUrls.default.http].filter(Boolean) as string[];
+const RPC_URLS = [
+  process.env.ARGUS_RPC_URL,
+  process.env.FOCI_RPC_URL,
+  ...arc.rpcUrls.default.http,
+].filter(Boolean) as string[];
 const client = createPublicClient({
   chain: arc,
   transport: fallback(
-    RPC_URLS.map((u) => http(u, { timeout: 8_000, retryCount: 2, retryDelay: 350 })),
+    RPC_URLS.map((u) =>
+      http(u, { timeout: 8_000, retryCount: 2, retryDelay: 350 }),
+    ),
     { retryCount: 1 },
   ),
 });
@@ -113,7 +161,12 @@ export type LaunchInfo = {
   usdcFirst: boolean;
 };
 
-export type Trade = { side: "buy" | "sell"; usdc: number; tx: string; block: number };
+export type Trade = {
+  side: "buy" | "sell";
+  usdc: number;
+  tx: string;
+  block: number;
+};
 
 export type BondingState = {
   token: Address;
@@ -134,16 +187,30 @@ export type BondingState = {
 // Small per-instance cache so a burst of agent calls doesn't hammer the RPC.
 const cache = new Map<string, { at: number; value: unknown }>();
 const TTL_MS = 30_000;
+const inflight = new Map<string, Promise<unknown>>();
 async function cached<T>(key: string, fn: () => Promise<T>): Promise<T> {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.value as T;
-  const value = await fn();
-  cache.set(key, { at: Date.now(), value });
-  return value;
+  // Concurrent callers share one fetch instead of each starting their own.
+  const running = inflight.get(key);
+  if (running) return running as Promise<T>;
+  const p = fn()
+    .then((value) => {
+      cache.set(key, { at: Date.now(), value });
+      return value;
+    })
+    .finally(() => inflight.delete(key));
+  inflight.set(key, p);
+  return p;
 }
 
 /** Scan the most recent `windows` log windows, newest first, until `want` hits (a few windows at a time). */
-async function scanRecent<T>(fetchWindow: (from: bigint, to: bigint) => Promise<T[]>, want: number, windows = 12, floor = 0n): Promise<T[]> {
+async function scanRecent<T>(
+  fetchWindow: (from: bigint, to: bigint) => Promise<T[]>,
+  want: number,
+  windows = 12,
+  floor = 0n,
+): Promise<T[]> {
   const head = await client.getBlockNumber();
   const ranges: [bigint, bigint][] = [];
   for (let to = head, i = 0; i < windows && to > floor; i++) {
@@ -153,7 +220,9 @@ async function scanRecent<T>(fetchWindow: (from: bigint, to: bigint) => Promise<
   }
   const out: T[] = [];
   for (let i = 0; i < ranges.length && out.length < want; i += 6) {
-    const batch = await Promise.all(ranges.slice(i, i + 6).map(([f, t]) => fetchWindow(f, t)));
+    const batch = await Promise.all(
+      ranges.slice(i, i + 6).map(([f, t]) => fetchWindow(f, t)),
+    );
     for (const logs of batch) out.push(...logs.reverse());
   }
   return out.slice(0, want);
@@ -161,14 +230,26 @@ async function scanRecent<T>(fetchWindow: (from: bigint, to: bigint) => Promise<
 
 /** Token symbol; falls back to name(), then the short address, when a token has no readable symbol. */
 export async function symbolOf(token: Address) {
-  const sym = await client.readContract({ address: token, abi: [ERC20_SYMBOL], functionName: "symbol" }).catch(() => "");
+  const sym = await client
+    .readContract({
+      address: token,
+      abi: [ERC20_SYMBOL],
+      functionName: "symbol",
+    })
+    .catch(() => "");
   if (sym.trim()) return sym.trim().slice(0, 16);
-  const name = await client.readContract({ address: token, abi: [ERC20_NAME], functionName: "name" }).catch(() => "");
+  const name = await client
+    .readContract({ address: token, abi: [ERC20_NAME], functionName: "name" })
+    .catch(() => "");
   return name.trim().slice(0, 16) || `${token.slice(0, 6)}…${token.slice(-4)}`;
 }
 
 /** Pool key of an Argus launch: (USDC, token) sorted, its fee, tick spacing 200, the launch's own hook. */
-export function poolKeyOf(token: Address, hook: Address, fee: number = ARGUS.poolFee) {
+export function poolKeyOf(
+  token: Address,
+  hook: Address,
+  fee: number = ARGUS.poolFee,
+) {
   const usdcFirst = ARGUS.usdc.toLowerCase() < token.toLowerCase();
   const key = {
     currency0: (usdcFirst ? ARGUS.usdc : token) as Address,
@@ -177,13 +258,20 @@ export function poolKeyOf(token: Address, hook: Address, fee: number = ARGUS.poo
     tickSpacing: ARGUS.tickSpacing,
     hooks: hook,
   };
-  const poolId = keccak256(encodeAbiParameters(parseAbiParameters("address, address, uint24, int24, address"), [key.currency0, key.currency1, key.fee, key.tickSpacing, key.hooks]));
+  const poolId = keccak256(
+    encodeAbiParameters(
+      parseAbiParameters("address, address, uint24, int24, address"),
+      [key.currency0, key.currency1, key.fee, key.tickSpacing, key.hooks],
+    ),
+  );
   return { key, poolId, usdcFirst };
 }
 
-const word = (hex: string, i: number) => BigInt(`0x${hex.slice(i * 64, i * 64 + 64) || "0"}`);
+const word = (hex: string, i: number) =>
+  BigInt(`0x${hex.slice(i * 64, i * 64 + 64) || "0"}`);
 const signed24 = (v: bigint) => Number(BigInt.asIntN(256, v));
-const addrAt = (hex: string, i: number) => `0x${hex.slice(i * 64 + 24, i * 64 + 64)}` as Address;
+const addrAt = (hex: string, i: number) =>
+  `0x${hex.slice(i * 64 + 24, i * 64 + 64)}` as Address;
 
 const launchInfos = new Map<string, LaunchInfo | null>();
 
@@ -193,30 +281,49 @@ const launchInfos = new Map<string, LaunchInfo | null>();
  * (hook, splitter, locker, positionId, tickStart, tickBond, …) with the creator only in its launch
  * event. Taxes, bond tick and quote asset are read from the launch's hook.
  */
-export async function launchOf(token: Address, hint?: { creator?: Address }): Promise<LaunchInfo | null> {
+export async function launchOf(
+  token: Address,
+  hint?: { creator?: Address },
+): Promise<LaunchInfo | null> {
   const k = token.toLowerCase();
   if (launchInfos.has(k)) return launchInfos.get(k)!;
   const { kvGet, kvSet } = await import("./store");
-  const stored = await kvGet<LaunchInfo | { none: true }>(`argus:launch:v3:${k}`).catch(() => null);
+  const stored = await kvGet<LaunchInfo | { none: true }>(
+    `argus:launch:v3:${k}`,
+  ).catch(() => null);
   if (stored) {
     const v = "none" in stored ? null : stored;
     launchInfos.set(k, v);
     return v;
   }
-  const data = encodeFunctionData({ abi: PORTAL, functionName: "launches", args: [token] });
+  const data = encodeFunctionData({
+    abi: PORTAL,
+    functionName: "launches",
+    args: [token],
+  });
   const records = await Promise.all(
     ARGUS.portals.map(async (p) => {
       // The getter returns a struct whose width differs per Portal, so decode the raw words.
       const r = await client.call({ to: p.address, data }).catch(() => null);
-      return { portal: p.address as Address, hex: (r?.data ?? "0x").slice(2), failed: r === null };
+      return {
+        portal: p.address as Address,
+        hex: (r?.data ?? "0x").slice(2),
+        failed: r === null,
+      };
     }),
   );
   const isV8 = (r: { portal: Address }) => r.portal.toLowerCase() === PORTAL8;
-  const found = records.find((r) => (isV8(r) ? r.hex.length >= 6 * 64 && word(r.hex, 0) !== 0n : r.hex.length >= 8 * 64 && word(r.hex, 4) !== 0n));
+  const found = records.find((r) =>
+    isV8(r)
+      ? r.hex.length >= 6 * 64 && word(r.hex, 0) !== 0n
+      : r.hex.length >= 8 * 64 && word(r.hex, 4) !== 0n,
+  );
   if (!found) {
     // Remember a miss only when every Portal answered: an RPC hiccup must not mark a real launch "not Argus".
     if (records.every((r) => !r.failed)) {
-      await kvSet(`argus:launch:v3:${k}`, { none: true }, 600).catch(() => undefined);
+      await kvSet(`argus:launch:v3:${k}`, { none: true }, 600).catch(
+        () => undefined,
+      );
       launchInfos.set(k, null);
     }
     return null;
@@ -224,10 +331,27 @@ export async function launchOf(token: Address, hint?: { creator?: Address }): Pr
   const v8 = isV8(found);
   const hook = addrAt(found.hex, v8 ? 0 : 4);
   const [bondTick, quoteAsset, buyTax, sellTax, creator] = await Promise.all([
-    client.readContract({ address: hook, abi: HOOK, functionName: "bondTick" }).then(Number).catch(() => null),
-    client.readContract({ address: hook, abi: HOOK, functionName: "quoteAsset" }).catch(() => ARGUS.usdc as Address),
-    v8 ? client.readContract({ address: hook, abi: HOOK, functionName: "buyTaxBps" }).then(Number) : Number(word(found.hex, 6)),
-    v8 ? client.readContract({ address: hook, abi: HOOK, functionName: "sellTaxBps" }).then(Number) : Number(word(found.hex, 7)),
+    client
+      .readContract({ address: hook, abi: HOOK, functionName: "bondTick" })
+      .then(Number)
+      .catch(() => null),
+    client
+      .readContract({ address: hook, abi: HOOK, functionName: "quoteAsset" })
+      .catch(() => ARGUS.usdc as Address),
+    v8
+      ? client
+          .readContract({ address: hook, abi: HOOK, functionName: "buyTaxBps" })
+          .then(Number)
+      : Number(word(found.hex, 6)),
+    v8
+      ? client
+          .readContract({
+            address: hook,
+            abi: HOOK,
+            functionName: "sellTaxBps",
+          })
+          .then(Number)
+      : Number(word(found.hex, 7)),
     v8 ? (hint?.creator ?? portal8Creator(token)) : addrAt(found.hex, 0),
   ]);
   const fee = v8 ? DYNAMIC_FEE : ARGUS.poolFee;
@@ -251,34 +375,82 @@ export async function launchOf(token: Address, hint?: { creator?: Address }): Pr
   return info;
 }
 
-type RawLog = { address: Address; topics: Hex[]; data: Hex; blockNumber: Hex; transactionHash: Hex };
+type RawLog = {
+  address: Address;
+  topics: Hex[];
+  data: Hex;
+  blockNumber: Hex;
+  transactionHash: Hex;
+};
 const hex = (n: bigint) => `0x${n.toString(16)}`;
 const topicAddr = (t: Hex) => `0x${t.slice(26)}` as Address;
 
 /** Portal #8 launch events in [from, to] (optionally for one token). */
-export async function portal8Logs(from: bigint, to: bigint, token?: Address): Promise<RawLog[]> {
-  const topics: (Hex | null)[] = [PORTAL8_LAUNCH, token ? (`0x${token.slice(2).toLowerCase().padStart(64, "0")}` as Hex) : null];
-  return client.request({ method: "eth_getLogs", params: [{ address: PORTAL8 as Address, topics, fromBlock: hex(from), toBlock: hex(to) }] } as never) as Promise<RawLog[]>;
+export async function portal8Logs(
+  from: bigint,
+  to: bigint,
+  token?: Address,
+): Promise<RawLog[]> {
+  const topics: (Hex | null)[] = [
+    PORTAL8_LAUNCH,
+    token
+      ? (`0x${token.slice(2).toLowerCase().padStart(64, "0")}` as Hex)
+      : null,
+  ];
+  return client.request({
+    method: "eth_getLogs",
+    params: [
+      {
+        address: PORTAL8 as Address,
+        topics,
+        fromBlock: hex(from),
+        toBlock: hex(to),
+      },
+    ],
+  } as never) as Promise<RawLog[]>;
 }
 
 /** The creator of a Portal #8 launch, from its launch event (newest windows first). */
 async function portal8Creator(token: Address): Promise<Address> {
-  const [log] = await scanRecent((f, t) => portal8Logs(f, t, token), 1, 80, ARGUS.portals[0].startBlock);
+  const [log] = await scanRecent(
+    (f, t) => portal8Logs(f, t, token),
+    1,
+    80,
+    ARGUS.portals[0].startBlock,
+  );
   if (!log) throw new Error("launch event not found");
   return topicAddr(log.topics[2]);
 }
 
 /** Current pool price (USDC per whole token) and tick. */
-export async function poolPrice(info: Pick<LaunchInfo, "poolId" | "usdcFirst">, decimals = 18, blockNumber?: bigint) {
-  const [sqrtPriceX96, tick] = await client.readContract({ address: ARGUS.stateView, abi: STATE_VIEW, functionName: "getSlot0", args: [info.poolId], blockNumber });
+export async function poolPrice(
+  info: Pick<LaunchInfo, "poolId" | "usdcFirst">,
+  decimals = 18,
+  blockNumber?: bigint,
+) {
+  const [sqrtPriceX96, tick] = await client.readContract({
+    address: ARGUS.stateView,
+    abi: STATE_VIEW,
+    functionName: "getSlot0",
+    args: [info.poolId],
+    blockNumber,
+  });
   const sqrt = Number(sqrtPriceX96) / 2 ** 96;
   const raw = sqrt * sqrt; // currency1 per currency0, raw units
   const usdcPerTokenRaw = raw === 0 ? 0 : info.usdcFirst ? 1 / raw : raw;
-  return { priceUsdc: usdcPerTokenRaw * 10 ** (decimals - USDC_DECIMALS), tick: Number(tick), sqrtPriceX96 };
+  return {
+    priceUsdc: usdcPerTokenRaw * 10 ** (decimals - USDC_DECIMALS),
+    tick: Number(tick),
+    sqrtPriceX96,
+  };
 }
 
 /** Progress from the opening tick toward the bond tick, 0..1. */
-export function bondProgress(info: Pick<LaunchInfo, "tickStart" | "tickBond">, tick: number, bonded: boolean) {
+export function bondProgress(
+  info: Pick<LaunchInfo, "tickStart" | "tickBond">,
+  tick: number,
+  bonded: boolean,
+) {
   if (bonded) return 1;
   if (info.tickBond === null || info.tickBond === info.tickStart) return 0;
   const p = (tick - info.tickStart) / (info.tickBond - info.tickStart);
@@ -292,31 +464,60 @@ export function getLaunches(limit = 8): Promise<Sourced<Launch[]>> {
   return cached(`launches:${limit}`, () => fetchLaunches(limit));
 }
 
-type StoredLaunches = { lastBlock: number; items: Launch[] };
+type StoredLaunches = { lastBlock: number; items: Launch[]; at?: number };
+/** Argus sees thousands of launches a day: only the newest ones are looked up (each costs ~13 RPC reads). */
+const ENRICH_MAX = 30;
+/** A list refreshed this recently (by any instance) is served as is. */
+const LAUNCHES_FRESH_MS = 30_000;
 const LAUNCHES_KEY = "argus:launches:v2";
 
 /** A launch seen in a Portal event. */
-export type LaunchLog = { token: Address; creator: Address; symbol?: string; block: number };
+export type LaunchLog = {
+  token: Address;
+  creator: Address;
+  symbol?: string;
+  block: number;
+};
 
 /** Launches from the live Portals in one block range: TokenCreated (#6, #7) and Portal #8's own event. */
 async function launchWindow(from: bigint, to: bigint): Promise<LaunchLog[]> {
   const [older, v8] = await Promise.all([
-    client.getLogs({ address: [...LIVE_PORTALS], event: TOKEN_CREATED, fromBlock: from, toBlock: to }),
+    client.getLogs({
+      address: [...LIVE_PORTALS],
+      event: TOKEN_CREATED,
+      fromBlock: from,
+      toBlock: to,
+    }),
     portal8Logs(from, to),
   ]);
   return [
-    ...older.map((l) => ({ token: l.args.token!, creator: l.args.creator!, symbol: l.args.symbol, block: Number(l.blockNumber) })),
-    ...v8.map((l) => ({ token: topicAddr(l.topics[1]), creator: topicAddr(l.topics[2]), block: Number(BigInt(l.blockNumber)) })),
+    ...older.map((l) => ({
+      token: l.args.token!,
+      creator: l.args.creator!,
+      symbol: l.args.symbol,
+      block: Number(l.blockNumber),
+    })),
+    ...v8.map((l) => ({
+      token: topicAddr(l.topics[1]),
+      creator: topicAddr(l.topics[2]),
+      block: Number(BigInt(l.blockNumber)),
+    })),
   ].sort((a, b) => a.block - b.block);
 }
 
 /** Launch events from the live Portals in [from, to], a few windows at a time. */
-export async function launchLogs(from: bigint, to: bigint): Promise<LaunchLog[]> {
+export async function launchLogs(
+  from: bigint,
+  to: bigint,
+): Promise<LaunchLog[]> {
   const ranges: [bigint, bigint][] = [];
-  for (let f = from; f <= to; f += LOG_WINDOW) ranges.push([f, f + LOG_WINDOW - 1n > to ? to : f + LOG_WINDOW - 1n]);
+  for (let f = from; f <= to; f += LOG_WINDOW)
+    ranges.push([f, f + LOG_WINDOW - 1n > to ? to : f + LOG_WINDOW - 1n]);
   const out: LaunchLog[] = [];
   for (let i = 0; i < ranges.length; i += 6) {
-    const batch = await Promise.all(ranges.slice(i, i + 6).map(([f, t]) => launchWindow(f, t)));
+    const batch = await Promise.all(
+      ranges.slice(i, i + 6).map(([f, t]) => launchWindow(f, t)),
+    );
     for (const logs of batch) out.push(...logs);
   }
   return out;
@@ -324,37 +525,75 @@ export async function launchLogs(from: bigint, to: bigint): Promise<LaunchLog[]>
 
 /** Launches are frequent but scans are windowed: keep the list in Redis and only read new blocks. */
 async function fetchLaunches(limit: number): Promise<Sourced<Launch[]>> {
-  const head = await client.getBlockNumber();
   const { kvGet, kvSet } = await import("./store");
   const stored = await kvGet<StoredLaunches>(LAUNCHES_KEY).catch(() => null);
-  const logs =
-    stored && head - BigInt(stored.lastBlock) <= LOG_WINDOW * 24n
-      ? await launchLogs(BigInt(stored.lastBlock) + 1n, head)
-      : await scanRecent(launchWindow, Math.max(limit, 20), 24, ARGUS.portals[2].startBlock);
-  const fresh = (
-    await Promise.all(
-      logs.map(async (l): Promise<Launch | null> => {
-        const info = await launchOf(l.token, { creator: l.creator }).catch(() => null);
-        if (!info || info.quoteAsset.toLowerCase() !== ARGUS.usdc.toLowerCase()) return null; // USDC pairs only
-        return {
-          token: l.token,
-          creator: l.creator,
-          hook: info.hook,
-          poolId: info.poolId,
-          symbol: (l.symbol ?? "").trim().slice(0, 16) || (await symbolOf(l.token)),
-          buyTaxPct: info.buyTaxBps / 100,
-          sellTaxPct: info.sellTaxBps / 100,
-          block: l.block,
-        };
-      }),
-    )
-  ).filter((x): x is Launch => x !== null);
+  if (
+    stored?.at &&
+    Date.now() - stored.at < LAUNCHES_FRESH_MS &&
+    stored.items.length >= limit
+  ) {
+    return {
+      source: "chain",
+      block: stored.lastBlock,
+      data: stored.items.slice(0, limit),
+    };
+  }
+  const head = await client.getBlockNumber();
+  // Newest windows first, stopping once there are enough launches; never below what was already read.
+  const floor = stored
+    ? BigInt(stored.lastBlock) + 1n
+    : ARGUS.portals[2].startBlock;
+  const logs = await scanRecent(
+    launchWindow,
+    Math.max(limit, ENRICH_MAX),
+    24,
+    floor,
+  );
+  const fresh: (Launch | null)[] = [];
+  for (let i = 0; i < logs.length; i += 6) {
+    // A few lookups at a time, so a busy stretch doesn't fire thousands of RPC calls at once.
+    fresh.push(
+      ...(await Promise.all(
+        logs.slice(i, i + 6).map(async (l): Promise<Launch | null> => {
+          const info = await launchOf(l.token, { creator: l.creator }).catch(
+            () => null,
+          );
+          if (
+            !info ||
+            info.quoteAsset.toLowerCase() !== ARGUS.usdc.toLowerCase()
+          )
+            return null; // USDC pairs only
+          return {
+            token: l.token,
+            creator: l.creator,
+            hook: info.hook,
+            poolId: info.poolId,
+            symbol:
+              (l.symbol ?? "").trim().slice(0, 16) || (await symbolOf(l.token)),
+            buyTaxPct: info.buyTaxBps / 100,
+            sellTaxPct: info.sellTaxBps / 100,
+            block: l.block,
+          };
+        }),
+      )),
+    );
+  }
   const seen = new Set<string>();
-  const items = [...fresh, ...(stored?.items ?? [])]
+  const items = [
+    ...fresh.filter((x): x is Launch => x !== null),
+    ...(stored?.items ?? []),
+  ]
     .sort((a, b) => b.block - a.block)
-    .filter((x) => !seen.has(x.token.toLowerCase()) && seen.add(x.token.toLowerCase()))
+    .filter(
+      (x) =>
+        !seen.has(x.token.toLowerCase()) && seen.add(x.token.toLowerCase()),
+    )
     .slice(0, 50);
-  await kvSet(LAUNCHES_KEY, { lastBlock: Number(head), items } satisfies StoredLaunches).catch(() => undefined);
+  await kvSet(LAUNCHES_KEY, {
+    lastBlock: Number(head),
+    items,
+    at: Date.now(),
+  } satisfies StoredLaunches).catch(() => undefined);
   return { source: "chain", block: Number(head), data: items.slice(0, limit) };
 }
 
@@ -370,9 +609,22 @@ async function fetchBonding(token: Address): Promise<Sourced<BondingState>> {
   if (!info) throw new NotFoundError(`${token} is not an Argus launch`);
   const [{ priceUsdc, tick }, bonded, symbol, swaps, head] = await Promise.all([
     poolPrice(info),
-    client.readContract({ address: info.hook, abi: HOOK, functionName: "bonded" }).catch(() => false),
+    client
+      .readContract({ address: info.hook, abi: HOOK, functionName: "bonded" })
+      .catch(() => false),
     symbolOf(token),
-    scanRecent((f, t) => client.getLogs({ address: ARGUS.poolManager, event: POOL_SWAP, args: { id: info.poolId }, fromBlock: f, toBlock: t }), 12, 6),
+    scanRecent(
+      (f, t) =>
+        client.getLogs({
+          address: ARGUS.poolManager,
+          event: POOL_SWAP,
+          args: { id: info.poolId },
+          fromBlock: f,
+          toBlock: t,
+        }),
+      12,
+      6,
+    ),
     client.getBlockNumber(),
   ]);
   const trades: Trade[] = swaps.map((l) => {
@@ -380,7 +632,9 @@ async function fetchBonding(token: Address): Promise<Sourced<BondingState>> {
     const usdcDelta = (info.usdcFirst ? l.args.amount0 : l.args.amount1) ?? 0n;
     return {
       side: usdcDelta < 0n ? "buy" : "sell",
-      usdc: Number(formatUnits(usdcDelta < 0n ? -usdcDelta : usdcDelta, USDC_DECIMALS)),
+      usdc: Number(
+        formatUnits(usdcDelta < 0n ? -usdcDelta : usdcDelta, USDC_DECIMALS),
+      ),
       tx: l.transactionHash,
       block: Number(l.blockNumber),
     };
@@ -405,18 +659,56 @@ async function fetchBonding(token: Address): Promise<Sourced<BondingState>> {
 }
 
 /** One-sentence market mood across the latest launches. */
-export async function getTide(): Promise<Sourced<{ reading: string; netFlowUsdc: number; mood: string; launches: number; trades: number }>> {
+export async function getTide(sample = 4): Promise<
+  Sourced<{
+    reading: string;
+    netFlowUsdc: number;
+    mood: string;
+    launches: number;
+    trades: number;
+  }>
+> {
   const launches = await getLaunches(8);
   // A pool that can't be read is skipped rather than invented.
-  const pools = (await Promise.all(launches.data.slice(0, 4).map((l) => getBonding(l.token).catch(() => null)))).filter((c): c is Sourced<BondingState> => c !== null);
+  const pools = (
+    await Promise.all(
+      launches.data
+        .slice(0, sample)
+        .map((l) => getBonding(l.token).catch(() => null)),
+    )
+  ).filter((c): c is Sourced<BondingState> => c !== null);
   const trades = pools.flatMap((c) => c.data.trades);
-  const netFlowUsdc = trades.reduce((s, t) => s + (t.side === "buy" ? t.usdc : -t.usdc), 0);
-  const mood = netFlowUsdc > 500 ? "flood tide" : netFlowUsdc > 0 ? "rising tide" : netFlowUsdc > -500 ? "slack water" : "ebb tide";
-  const leader = [...pools].filter((p) => !p.data.bonded).sort((a, b) => b.data.progress - a.data.progress)[0]?.data;
+  const netFlowUsdc = trades.reduce(
+    (s, t) => s + (t.side === "buy" ? t.usdc : -t.usdc),
+    0,
+  );
+  const mood =
+    netFlowUsdc > 500
+      ? "flood tide"
+      : netFlowUsdc > 0
+        ? "rising tide"
+        : netFlowUsdc > -500
+          ? "slack water"
+          : "ebb tide";
+  const leader = [...pools]
+    .filter((p) => !p.data.bonded)
+    .sort((a, b) => b.data.progress - a.data.progress)[0]?.data;
   const reading = `${mood[0].toUpperCase()}${mood.slice(1)} on Argus: ${netFlowUsdc >= 0 ? "+" : ""}${netFlowUsdc.toFixed(0)} USDC net across ${trades.length} recent trades${
-    leader ? `; $${leader.symbol} leads at ${(leader.progress * 100).toFixed(0)}% to bonding.` : "."
+    leader
+      ? `; $${leader.symbol} leads at ${(leader.progress * 100).toFixed(0)}% to bonding.`
+      : "."
   }`;
-  return { source: "chain", block: launches.block, data: { reading, netFlowUsdc, mood, launches: launches.data.length, trades: trades.length } };
+  return {
+    source: "chain",
+    block: launches.block,
+    data: {
+      reading,
+      netFlowUsdc,
+      mood,
+      launches: launches.data.length,
+      trades: trades.length,
+    },
+  };
 }
 
 /** An Argus token page. */

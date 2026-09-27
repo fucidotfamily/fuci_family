@@ -10,7 +10,16 @@ export type FuciTool = {
   method: "GET" | "POST";
   price: string; // USD, x402 money format
   description: string;
-  input?: Record<string, { type: string; description: string }>;
+  input?: Record<
+    string,
+    {
+      type: string;
+      description: string;
+      optional?: boolean;
+      /** A realistic value, shown to agents in the 402 challenge (x402 Bazaar). */
+      example: string | number;
+    }
+  >;
 };
 
 export const TOOLS: FuciTool[] = [
@@ -20,7 +29,17 @@ export const TOOLS: FuciTool[] = [
     path: "/api/x402/argus/launches",
     method: "GET",
     price: "$0.001",
-    description: "Latest token launches on Argus, the launchpad on Arc: who launched them, their pool and their buy/sell tax.",
+    description:
+      "Latest token launches on Argus, the launchpad on Arc: who launched them, their pool and their buy/sell tax.",
+    input: {
+      limit: {
+        type: "integer",
+        description:
+          "How many launches to return, newest first (1–20, default 8)",
+        optional: true,
+        example: 8,
+      },
+    },
   },
   {
     id: "argus_bonding",
@@ -28,8 +47,16 @@ export const TOOLS: FuciTool[] = [
     path: "/api/x402/argus/bonding",
     method: "GET",
     price: "$0.002",
-    description: "Price, progress toward bonding, taxes and recent buys and sells for one Argus token.",
-    input: { token: { type: "string", description: "Token address (0x…) of an Argus launch" } },
+    description:
+      "Price, progress toward bonding, taxes and recent buys and sells for one Argus token.",
+    input: {
+      token: {
+        type: "string",
+        description: "Token address (0x…) of an Argus launch (default: $FUCI)",
+        optional: true,
+        example: "0xe66d5169c5d235209d74e976e594060c44c64420",
+      },
+    },
   },
   {
     id: "fucus_oracle",
@@ -37,7 +64,34 @@ export const TOOLS: FuciTool[] = [
     path: "/api/x402/fucus/oracle",
     method: "GET",
     price: "$0.0005",
-    description: "A tide reading: net USDC flow and sentiment across the newest Argus launches, in one sentence.",
+    description:
+      "A tide reading: net USDC flow and sentiment across the newest Argus launches, in one sentence.",
+    input: {
+      launches: {
+        type: "integer",
+        description:
+          "How many of the newest launches to read trades from (1–6, default 4)",
+        optional: true,
+        example: 4,
+      },
+    },
+  },
+  {
+    id: "fuci_risk",
+    name: "Risk Rating",
+    path: "/api/x402/risk",
+    method: "GET",
+    price: "$0.002",
+    description:
+      "A graded risk report (A–F) for a token on Arc or a DeFi protocol: contract control, liquidity, holder concentration, audits, hack history, TVL and yield sustainability, each explained with its source.",
+    input: {
+      target: {
+        type: "string",
+        description:
+          "Token address on Arc (0x…) or a DefiLlama protocol slug (e.g. morpho-blue)",
+        example: "morpho-blue",
+      },
+    },
   },
   {
     id: "fuci_agent",
@@ -45,8 +99,15 @@ export const TOOLS: FuciTool[] = [
     path: "/api/agent/run",
     method: "POST",
     price: "$0.04",
-    description: "Pay-per-prompt: a Fuci agent answers your question by buying the tools above and writing a brief (with Claude when enabled).",
-    input: { prompt: { type: "string", description: "Your question about Argus launches / Arc markets" } },
+    description:
+      "Pay-per-prompt: a Fuci agent answers your question by buying the tools above and writing a brief (with Claude when enabled).",
+    input: {
+      prompt: {
+        type: "string",
+        description: "Your question about Argus launches / Arc markets",
+        example: "What is happening on Argus right now?",
+      },
+    },
   },
 ];
 

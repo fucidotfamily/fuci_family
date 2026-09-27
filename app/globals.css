@@ -314,3 +314,14 @@ pre {
     animation: none;
   }
 }
+
+/* Mobile: grid items may shrink below their content (long names, truncated text), so a grid never
+   grows wider than the screen. Without this an implicit or fr column sizes to its widest text. */
+.grid > * {
+  min-width: 0;
+}
+
+/* Inline code (URLs, env names) may wrap anywhere instead of pushing past a narrow screen. */
+:not(pre) > code {
+  overflow-wrap: anywhere;
+}

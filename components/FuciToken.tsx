@@ -1,34 +1,26 @@
 import { FUCI_LAUNCH, FUCI_TOKEN } from "@/lib/config";
 import { argusTokenUrl, getBonding, type BondingState } from "@/lib/argus";
+import { fuciMarket, type Market } from "@/lib/publicStats";
 import { CopyButton } from "./CopyButton";
 
-const STAGES = [
-  { name: "Spore", range: "0–25%", body: "Launched on Argus with real Uniswap v4 liquidity from the first block. Every buy is USDC." },
-  { name: "Holdfast", range: "25–50%", body: "The community anchors. Agents start watching the curve." },
-  { name: "Frond", range: "50–99%", body: "Branching out. The price climbs toward the bond tick." },
-  { name: "Kelp Forest", range: "Bonded", body: "Crossed the bond tick: bonded for good. Taxes keep paying holders and the creator in USDC." },
-];
+// $FUCI lives on Arc mainnet (Argus is mainnet-only).
+const EXPLORER = "https://explorer.arc.io";
+const DEXSCREENER = `https://dexscreener.com/arc/${FUCI_TOKEN}`;
 
-function stageIndex(p: number, bonded: boolean) {
-  if (bonded) return 3;
-  if (p >= 0.5) return 2;
-  if (p >= 0.25) return 1;
-  return 0;
-}
+const JOURNEY = ["Spore", "Holdfast", "Frond", "Kelp Forest"];
 
-// $FUCI's contract address on the Arc mainnet explorer (Argus is mainnet-only).
-const mainnetAddress = (a: string) => `https://explorer.arc.io/address/${a}`;
+const compact = (n: number) => `$${Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n)}`;
+const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+/** $FUCI on the home page: bonded on Argus, live market numbers, recent trades, and how holding pays. */
 export async function FuciToken() {
-  let curve: BondingState | null = null;
-  let error: string | null = null;
-  if (FUCI_TOKEN) {
-    try {
-      curve = (await getBonding(FUCI_TOKEN)).data;
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
-    }
-  }
+  const [curve, market] = await Promise.all([
+    getBonding(FUCI_TOKEN)
+      .then((r) => r.data)
+      .catch(() => null),
+    fuciMarket().catch(() => null),
+  ]);
+  const bonded = curve?.bonded ?? false;
 
   return (
     <section id="fuci" className="mx-auto max-w-6xl px-4 py-16 sm:px-6" aria-labelledby="fuci-title">
@@ -36,103 +28,164 @@ export async function FuciToken() {
         <div>
           <p className="eyebrow">$FUCI × Argus</p>
           <h2 id="fuci-title" className="font-display mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
-            Seeded on Argus. Grown by agents.
+            {bonded ? "Bonded. Now it pays holders." : "Seeded on Argus. Grown by agents."}
           </h2>
           <p className="mt-4 text-ink-2">
-            $FUCI launches on{" "}
+            $FUCI launched on{" "}
             <a href="https://argus.world" target="_blank" rel="noreferrer" className="text-ink underline underline-offset-2">
               Argus
             </a>
-            , the token launchpad on Arc: a Uniswap v4 pool from the first block, with taxes paid back in USDC. Argus is also what Fuci
-            agents watch and trade, so the token and the agents grow together.
+            , the token launchpad on Arc{bonded ? ", and crossed its bond tick: it is bonded for good" : ""}. Every trade pays a {FUCI_LAUNCH.buyTaxPct}% tax, and{" "}
+            {FUCI_LAUNCH.split.dividendsPct}% of the creator share goes back to holders as USDC. Argus is also what Fuci agents watch and trade, so the token and the
+            agents grow together.
           </p>
-          {FUCI_TOKEN && (
-            <div className="mt-6 flex flex-wrap items-center gap-2">
-              <code className="rounded bg-surface-2 px-3 py-2 font-mono text-xs break-all">{FUCI_TOKEN}</code>
-              <CopyButton text={FUCI_TOKEN} />
-              <a href={mainnetAddress(FUCI_TOKEN)} target="_blank" rel="noreferrer" className="text-sm text-ink hover:underline">
-                Explorer
-              </a>
-            </div>
-          )}
-          {FUCI_TOKEN ? (
-            <a href={argusTokenUrl(FUCI_TOKEN)} target="_blank" rel="noreferrer" className="btn btn-primary mt-6">
+
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            <code className="rounded bg-surface-2 px-3 py-2 font-mono text-xs break-all">{FUCI_TOKEN}</code>
+            <CopyButton text={FUCI_TOKEN} />
+            <a href={`${EXPLORER}/address/${FUCI_TOKEN}`} target="_blank" rel="noreferrer" className="text-sm text-ink hover:underline">
+              Explorer
+            </a>
+          </div>
+          <div className="mt-6 flex flex-wrap gap-2">
+            <a href={argusTokenUrl(FUCI_TOKEN)} target="_blank" rel="noreferrer" className="btn btn-primary">
               Buy on Argus ↗
             </a>
-          ) : (
-            <p className="mt-6 flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-muted">
-              <span className="live-dot" /> Launching soon on Argus
-            </p>
-          )}
-          {Tokenomics()}
+            <a href={DEXSCREENER} target="_blank" rel="noreferrer" className="btn btn-ghost">
+              Chart on DexScreener ↗
+            </a>
+          </div>
+
+          {HowItPays()}
         </div>
 
-        <div className="card reveal p-6">
-          {!FUCI_TOKEN ? (
-            <div className="grid min-h-64 place-items-center text-center">
-              <div>
-                <p className="eyebrow">Coming soon</p>
-                <p className="font-display mt-3 text-3xl font-semibold">$FUCI is still a spore.</p>
-                <p className="mt-3 text-ink-2">The contract address and live bonding progress appear here the moment it launches on Argus.</p>
-              </div>
-            </div>
-          ) : !curve ? (
-            <div className="grid min-h-64 place-items-center text-center">
-              <div>
-                <p className="font-display text-2xl font-semibold">Pool unavailable right now</p>
-                <p className="mt-2 break-words text-sm text-muted">{error}</p>
-              </div>
-            </div>
-          ) : (
-            CurveCard({ curve })
-          )}
+        <div className="space-y-4">
+          {LiveCard({ curve, market })}
+          {Tokenomics()}
         </div>
       </div>
     </section>
   );
 }
 
-function CurveCard({ curve }: { curve: BondingState }) {
-  const idx = stageIndex(curve.progress, curve.bonded);
-  const pct = Math.round(curve.progress * 100);
+function LiveCard({ curve, market }: { curve: BondingState | null; market: Market | null }) {
+  const bonded = curve?.bonded ?? false;
+  const stage = bonded ? 3 : curve ? (curve.progress >= 0.5 ? 2 : curve.progress >= 0.25 ? 1 : 0) : -1;
+  const tiles: [string, string][] = [
+    ["Price", market ? `${usd(market.priceUsd * 1e6)}` : curve ? `${usd(curve.priceUsdc * 1e6)}` : "—"],
+    ["Market cap", market ? compact(market.marketCapUsd) : "—"],
+    ["Liquidity", market ? compact(market.liquidityUsd) : "—"],
+    ["24h volume", market ? compact(market.volume24hUsd) : "—"],
+  ];
+
   return (
-    <>
-      <div className="flex items-baseline justify-between">
-        <p className="font-display text-2xl font-semibold">${curve.symbol}</p>
-        <p className="font-mono text-xs text-muted">live · Arc mainnet</p>
+    <div className="card reveal p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="font-display text-2xl font-semibold">$FUCI</p>
+        <div className="flex flex-wrap gap-2">
+          {bonded ? (
+            <span className="rounded-full border border-up bg-up/10 px-3 py-1 font-mono text-xs uppercase tracking-widest text-up">✓ Bonded</span>
+          ) : (
+            <span className="font-mono text-xs text-muted">live · Arc mainnet</span>
+          )}
+          <a
+            href={FUCI_LAUNCH.devLock.url}
+            target="_blank"
+            rel="noreferrer"
+            title={`Unlocks ${FUCI_LAUNCH.devLock.until}`}
+            className="rounded-full border border-up bg-up/10 px-3 py-1 font-mono text-xs uppercase tracking-widest text-up hover:underline"
+          >
+            🔒 Dev locked {FUCI_LAUNCH.devLock.period}
+          </a>
+        </div>
       </div>
-      <div className="mt-5 h-3 overflow-hidden rounded-sm bg-surface-2" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Progress to bonding">
-        <div className="h-full rounded-sm bg-up" style={{ width: `${pct}%` }} />
-      </div>
-      <p className="mt-2 font-mono text-xs text-muted">
-        {curve.priceUsdc.toPrecision(3)} USDC · {pct}% to bonding · tax {curve.buyTaxPct}% / {curve.sellTaxPct}%
+
+      <dl className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {tiles.map(([label, value]) => (
+          <div key={label} className="rounded-md border border-line p-3">
+            <dt className="text-xs text-muted">{label}</dt>
+            <dd className="font-display mt-1 text-xl font-semibold tabular-nums">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-2 font-mono text-[11px] text-muted">
+        Price per 1M $FUCI.{" "}
+        {market ? (
+          <a href={market.url} target="_blank" rel="noreferrer" className="underline">
+            {market.txns24h.toLocaleString("en-US")} trades in 24h · DexScreener
+          </a>
+        ) : (
+          "Market data from DexScreener."
+        )}
       </p>
-      <ol className="mt-6 grid gap-3 sm:grid-cols-2">
-        {STAGES.map((s, i) => (
-          <li key={s.name} className={`rounded-md border p-4 ${i === idx ? "border-ink bg-surface-2" : "border-line"} ${i > idx ? "opacity-60" : ""}`}>
-            <p className="flex items-center justify-between">
-              <span className="font-display text-lg font-semibold">{s.name}</span>
-              <span className="font-mono text-[11px] text-muted">{s.range}</span>
-            </p>
-            <p className="mt-1 text-sm text-ink-2">{s.body}</p>
+
+      {/* The journey: every stage done once bonded */}
+      <ol className="mt-6 flex items-center gap-1" aria-label="Launch journey">
+        {JOURNEY.map((name, i) => (
+          <li key={name} className="flex flex-1 flex-col gap-1.5">
+            <span className={`h-1.5 rounded-full ${i <= stage ? "bg-up" : "bg-surface-2"}`} />
+            <span className={`font-mono text-[10px] uppercase tracking-widest ${i === stage ? "text-ink" : "text-muted"}`}>
+              {i <= stage ? "✓ " : ""}
+              {name}
+            </span>
           </li>
         ))}
       </ol>
-    </>
+
+      {curve && curve.trades.length > 0 && (
+        <div className="mt-6">
+          <p className="text-sm font-semibold">Latest trades</p>
+          <ul className="mt-2 divide-y divide-line text-sm">
+            {curve.trades.slice(0, 5).map((t) => (
+              <li key={t.tx} className="flex items-center gap-3 py-2">
+                <span className={`w-10 font-mono text-xs uppercase ${t.side === "buy" ? "text-up" : "text-danger"}`}>{t.side}</span>
+                <span className="flex-1 tabular-nums">{usd(t.usdc)}</span>
+                <a href={`${EXPLORER}/tx/${t.tx}`} target="_blank" rel="noreferrer" className="font-mono text-[11px] text-muted hover:text-ink hover:underline">
+                  {t.tx.slice(0, 8)}… ↗
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
 
-/** $FUCI's launch settings: fixed forever once it launches on Argus. */
+/** How holding $FUCI earns USDC (Argus' revenue splitter). */
+function HowItPays() {
+  const t = FUCI_LAUNCH;
+  const steps = [
+    ["Every trade is taxed", `${t.buyTaxPct}% on buys, ${t.sellTaxPct}% on sells, paid in USDC. Fixed forever at launch.`],
+    ["Holders get the biggest share", `Argus keeps ${t.argusCutPct}%. Of the rest, ${t.split.dividendsPct}% is credited to $FUCI holders, by how much they hold.`],
+    ["Claim your USDC", "Dividends build up while you hold. Claim them any time on the $FUCI page on Argus."],
+  ];
+  return (
+    <ol className="mt-10 space-y-4">
+      {steps.map(([title, body], i) => (
+        <li key={title} className="flex gap-4">
+          <span className="font-display grid size-8 shrink-0 place-items-center rounded-full border border-line text-sm font-semibold">{i + 1}</span>
+          <div>
+            <p className="font-semibold">{title}</p>
+            <p className="mt-0.5 text-sm text-ink-2">{body}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** $FUCI's launch settings: fixed forever on Argus. */
 function Tokenomics() {
   const t = FUCI_LAUNCH;
   const devTokens = (t.supply * t.devBuyPct) / 100;
   const tiles = [
     [`${t.buyTaxPct}%`, "buy tax"],
     [`${t.sellTaxPct}%`, "sell tax"],
-    [`${t.devBuyPct}%`, `dev buy · ${devTokens / 1e6}M $FUCI`],
+    [`${t.devBuyPct}%`, `dev buy · ${devTokens / 1e6}M $FUCI · locked`],
   ];
   return (
-    <div className="card mt-8 p-5">
+    <div className="card p-5">
       <p className="eyebrow">Tokenomics</p>
       <div className="mt-3 grid grid-cols-3 gap-2">
         {tiles.map(([v, l]) => (
@@ -142,6 +195,19 @@ function Tokenomics() {
           </div>
         ))}
       </div>
+
+      <a
+        href={t.devLock.url}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-up/50 bg-up/5 p-3 text-sm hover:border-up"
+      >
+        <span aria-hidden>🔒</span>
+        <span>
+          <b>Dev bag locked for {t.devLock.period}</b> <span className="text-ink-2">· {(t.devLock.tokens / 1e6).toFixed(1)}M $FUCI, the whole dev wallet</span>
+        </span>
+        <span className="ml-auto font-mono text-xs text-up">unlocks {t.devLock.until} ↗</span>
+      </a>
 
       <p className="mt-5 text-sm font-semibold">Where the tax goes</p>
       <div className="mt-2 flex h-3 overflow-hidden rounded-sm" role="img" aria-label={`${t.split.dividendsPct}% dividends, ${t.split.creatorPct}% creator funds`}>
@@ -160,13 +226,9 @@ function Tokenomics() {
             → {t.creatorFundsTo.label}
           </a>
         </li>
-        <li className="text-xs text-muted">
-          Buyback &amp; burn {t.split.buybackPct}% · liquidity {t.split.liquidityPct}%
-        </li>
       </ul>
       <p className="mt-4 text-xs text-muted">
-        Argus keeps {t.argusCutPct}% of every tax; the split above applies to the other {100 - t.argusCutPct}%. Taxes and split are fixed forever at launch. Supply{" "}
-        {t.supply / 1e9}B.
+        Argus keeps {t.argusCutPct}% of every tax; the split above applies to the other {100 - t.argusCutPct}%. Supply {t.supply / 1e9}B.
       </p>
     </div>
   );

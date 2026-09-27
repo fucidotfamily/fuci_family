@@ -35,12 +35,12 @@ export function MyAgentButton() {
   };
 
   const main = mine ? (
-    <Link href={`/agent/${mine.id}`} className="btn btn-primary !px-4 !py-2" title={`Your agent: ${mine.name}`} aria-haspopup={wallet ? "menu" : undefined}>
+    <Link href={`/agent/${mine.id}`} className="btn btn-primary whitespace-nowrap !px-4 !py-2" title={`Your agent: ${mine.name}`} aria-haspopup={wallet ? "menu" : undefined}>
       My agent
     </Link>
   ) : (
-    <Link href="/spawn" className="btn btn-primary !px-4 !py-2" aria-haspopup={wallet ? "menu" : undefined}>
-      Spawn agent
+    <Link href="/spawn" className="btn btn-primary whitespace-nowrap !px-4 !py-2" aria-haspopup={wallet ? "menu" : undefined}>
+      Spawn<span className="hidden sm:inline">&nbsp;agent</span>
     </Link>
   );
   if (!wallet) return main;

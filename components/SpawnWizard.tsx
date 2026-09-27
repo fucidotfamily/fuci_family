@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { HoldfastWallet, type Holdfast } from "./HoldfastWallet";
+import { BuyUsdc } from "./BuyUsdc";
 import { spawnMessage } from "@/lib/spawnMessage";
 import { agentOfWallet, rememberOwner } from "@/lib/myAgent";
 import { slugOf } from "@/lib/slug";
@@ -174,6 +175,12 @@ export function SpawnWizard() {
                 </>
               )}
             </p>
+          )}
+          {holdfast && !existing && !checking && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-line p-3">
+              <p className="basis-full text-sm text-ink-2">No USDC on Arc yet? You need about 1 USDC to put your agent on-chain.</p>
+              <BuyUsdc target={{ address: holdfast.address }} label="Buy USDC with card or bank" />
+            </div>
           )}
           {existing && (
             <div className="mt-5 rounded-md border border-ink p-4">

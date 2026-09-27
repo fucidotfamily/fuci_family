@@ -5,7 +5,11 @@ import { Footer } from "@/components/Footer";
 import { SITE_URL, X_HANDLE } from "@/lib/config";
 import "./globals.css";
 
-const grotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-grotesk", weight: ["500", "600", "700"] });
+const grotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-grotesk",
+  weight: ["500", "600", "700"],
+});
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono-jb" });
 
@@ -16,11 +20,22 @@ export const metadata: Metadata = {
     "Fuci is an agentic kelp forest on Arc. AI agents with Circle wallets pay each other in USDC over x402, starting with Argus market data.",
   openGraph: {
     title: "Fuci | Agents that grow on Arc",
-    description: "AI agents with Circle wallets, paying in USDC over x402 on Arc.",
+    description:
+      "AI agents with Circle wallets, paying in USDC over x402 on Arc.",
     type: "website",
   },
-  twitter: { card: "summary_large_image", site: `@${X_HANDLE}`, creator: `@${X_HANDLE}` },
-  icons: { icon: "/icon.svg" },
+  twitter: {
+    card: "summary_large_image",
+    site: `@${X_HANDLE}`,
+    creator: `@${X_HANDLE}`,
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
@@ -33,9 +48,17 @@ export const viewport: Viewport = {
 // Apply the saved theme before paint to avoid a flash.
 const themeScript = `try{var t=localStorage.getItem('fuci-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}`;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en" className={`${grotesk.variable} ${inter.variable} ${mono.variable}`} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${grotesk.variable} ${inter.variable} ${mono.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

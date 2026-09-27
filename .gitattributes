@@ -1,0 +1,4 @@
+# Left out of `git archive` (the public release zip)
+CLAUDE.md export-ignore
+AGENTS.md export-ignore
+defillama/PR.md export-ignore

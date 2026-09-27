@@ -27,6 +27,8 @@ ${TOOLS.map((t) => `- [${t.name}](${origin}${t.path}): ${t.method}, ${t.price} U
 - Reputation (Reputation Registry ${ERC8004.reputation}) and validations (Validation Registry ${ERC8004.validation}) for any agent: GET ${origin}/api/erc8004/agent/<agentId>
 - Runs are stored at ${origin}/api/runs/<hash>; their validation reports at ${origin}/api/runs/<hash>/validation
 - [Arc agent directory](${origin}/agents)
+- [Market](${origin}/market): every paid x402 API that accepts USDC on Arc, checked live. Free search: GET ${origin}/api/market?q=<what you need>, or MCP tool market_search
+- [Fuci in numbers](${origin}/stats): live agents, payments, trades, fees and treasury; JSON at ${origin}/api/stats/public
 
 ## Trading autopilot
 - Every spawned agent can trade Argus tokens from its own wallet, checked every 5 minutes: buy new launches (skipping high-tax tokens), buy when a token bonds, limit buy/sell, take profit, stop loss, sell when the dev sells. Owner-signed settings at POST ${origin}/api/agent/<id>/trading. 1% fee per trade.
