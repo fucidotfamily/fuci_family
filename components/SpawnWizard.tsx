@@ -376,7 +376,7 @@ export function SpawnWizard() {
                 <dd className="font-mono">{holdfast ? `${holdfast.address.slice(0, 6)}…${holdfast.address.slice(-4)}` : "–"}</dd>
               </div>
             </dl>
-            <p className="mt-4 text-xs text-muted">Next, on its page: fund it and switch on Automation to let it run on its own.</p>
+            <p className="mt-4 text-xs text-muted">Next, on its page: add USDC, then start Autopilot to trade on its own (smart entry, DCA, take profit, stop loss) or switch on Automation for scheduled reports.</p>
           </div>
           {error && <p className="mt-4 text-sm text-danger">{error}</p>}
           {nav(2, spawn, busy ? "Spawning…" : "Spawn agent", busy || !slugOf(name, holdfast?.address))}

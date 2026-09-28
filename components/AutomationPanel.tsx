@@ -6,7 +6,7 @@ import { automationDetail, type AutomationSettings } from "@/lib/ownerMessage";
 import { errText } from "@/lib/browserWallet";
 
 type State = {
-  automation: { enabled: boolean; everyMinutes: number; strategy: string; prompt: string; nextRunAt: number; pausedReason?: string } | null;
+  automation: { enabled: boolean; everyMinutes: number; strategy: string; prompt: string; market?: boolean; nextRunAt: number; pausedReason?: string } | null;
   dailyLimitUsdc: number;
   spentToday: number;
 };
@@ -53,6 +53,7 @@ export function ScheduledReports({ agent, defaultStrategy }: { agent: Owner; def
                 strategy: s.automation?.strategy ?? defaultStrategy,
                 prompt: s.automation?.prompt ?? "",
                 dailyLimitUsdc: s.dailyLimitUsdc,
+                market: s.automation?.market ?? false,
               },
           );
         })
@@ -118,6 +119,13 @@ export function ScheduledReports({ agent, defaultStrategy }: { agent: Owner; def
           <input type="number" min={0.01} max={100} step={0.01} className="mt-1 block w-24 field px-3 py-2 font-mono" value={form.dailyLimitUsdc} onChange={(e) => setForm({ ...form, dailyLimitUsdc: Number(e.target.value) })} />
         </label>
       </div>
+      <label className="mt-3 flex items-start gap-2 text-sm text-ink-2">
+        <input type="checkbox" className="mt-1" checked={Boolean(form.market)} onChange={(e) => setForm({ ...form, market: e.target.checked })} />
+        <span>
+          Also buy data from other sellers in <a href="/market" className="underline underline-offset-2">Fuci Market</a> when it helps (up to 0.02 USDC a run, inside the daily max). Sellers
+          are checked with Know Your Agent first.
+        </span>
+      </label>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button className={`tab ${form.enabled ? "tab-active" : ""}`} aria-pressed={form.enabled} disabled={busy} onClick={() => save(!form.enabled)}>
           {form.enabled ? "On" : "Off"}

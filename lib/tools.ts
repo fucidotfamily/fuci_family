@@ -94,13 +94,30 @@ export const TOOLS: FuciTool[] = [
     },
   },
   {
+    id: "fuci_kya",
+    name: "Know Your Agent",
+    path: "/api/x402/kya",
+    method: "GET",
+    price: "$0.002",
+    description:
+      "Check another AI agent before you pay, hire or trust it: an A–F trust grade from its ERC-8004 identity, registration file, on-chain reputation and validations, wallet activity, USDC balance and x402 payment record, each explained with its source.",
+    input: {
+      agent: {
+        type: "string",
+        description:
+          "An ERC-8004 agent id on Arc (e.g. 12) or the agent's wallet address (0x…)",
+        example: "0xaf6a0084296e759b4457443b9f88f21ae57d9a3c",
+      },
+    },
+  },
+  {
     id: "fuci_agent",
     name: "Ask the Fucus Agent",
     path: "/api/agent/run",
     method: "POST",
     price: "$0.04",
     description:
-      "Pay-per-prompt: a Fuci agent answers your question by buying the tools above and writing a brief (with Claude when enabled).",
+      "Pay-per-prompt: a Fuci agent answers your question by buying the tools above, and up to 0.02 USDC of data from other sellers in Fuci Market when it helps (each seller checked with Know Your Agent), then writes a brief (with Claude when enabled).",
     input: {
       prompt: {
         type: "string",

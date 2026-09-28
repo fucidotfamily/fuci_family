@@ -5,6 +5,8 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { CopyButton } from "./CopyButton";
 import { setupMessage } from "@/lib/setupMessage";
 import { FACTORY_ABI, FACTORY_BYTECODE } from "@/lib/factoryArtifact";
+import { EscrowSetup } from "./EscrowSetup";
+import type { EscrowInfo } from "@/lib/escrow";
 import { ERC8004 } from "@/lib/erc8004Abi";
 import {
   SITE_CHAIN,
@@ -49,6 +51,8 @@ type Status = Info & {
     agentsCreated: number;
   } | null;
   trading?: { feesUsdc: number; treasury: string | null } | null;
+  escrow?: EscrowInfo | null;
+  treasury?: string;
 };
 type Auth = {
   wallet: { address: string; issuedAt: number; signature: string };
@@ -727,6 +731,19 @@ export function SetupPanel() {
             </div>
           )}
         </section>
+      )}
+
+      {status?.authed && info.owner && (
+        <EscrowSetup
+          escrow={status.escrow}
+          owner={info.owner}
+          treasuryDefault={status.treasury ?? status.factory?.treasury ?? info.owner}
+          onDeployed={async (txHash) => {
+            const r = await post("set-escrow", auth, { txHash });
+            if (r) refresh();
+            return Boolean(r);
+          }}
+        />
       )}
 
       {status?.authed && status.trading && (

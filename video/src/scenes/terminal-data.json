@@ -1,0 +1,78 @@
+{
+"calls": 526,
+"usdc": 1.473,
+"lines": [
+{
+"t": "09:06:40",
+"who": "house agent",
+"tool": "Tide Oracle",
+"usdc": 0.0005
+},
+{
+"t": "09:06:43",
+"who": "house agent",
+"tool": "Argus Launch Scout",
+"usdc": 0.001
+},
+{
+"t": "09:06:44",
+"who": "house agent",
+"tool": "Bonding Watcher",
+"usdc": 0.002
+},
+{
+"t": "09:11:45",
+"who": "0xaf6a\u20269a3c",
+"tool": "Tide Oracle",
+"usdc": 0.0005
+},
+{
+"t": "09:12:15",
+"who": "0xaf6a\u20269a3c",
+"tool": "Argus Launch Scout",
+"usdc": 0.001
+},
+{
+"t": "09:12:47",
+"who": "0xaf6a\u20269a3c",
+"tool": "Bonding Watcher",
+"usdc": 0.002
+},
+{
+"t": "09:13:18",
+"who": "0xaf6a\u20269a3c",
+"tool": "Risk Rating",
+"usdc": 0.002
+},
+{
+"t": "09:18:37",
+"who": "0xaf6a\u20269a3c",
+"tool": "Tide Oracle",
+"usdc": 0.0005
+},
+{
+"t": "09:19:07",
+"who": "0xaf6a\u20269a3c",
+"tool": "Argus Launch Scout",
+"usdc": 0.001
+},
+{
+"t": "09:19:37",
+"who": "0xaf6a\u20269a3c",
+"tool": "Bonding Watcher",
+"usdc": 0.002
+},
+{
+"t": "09:20:12",
+"who": "0xaf6a\u20269a3c",
+"tool": "Risk Rating",
+"usdc": 0.002
+},
+{
+"t": "09:25:43",
+"who": "0xaf6a\u20269a3c",
+"tool": "Tide Oracle",
+"usdc": 0.0005
+}
+]
+}

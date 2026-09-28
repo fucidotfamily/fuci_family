@@ -1,12 +1,54 @@
 import Link from "next/link";
 import { Logo } from "./Logo";
-import { GITHUB_URL, SHOW_FUCI_TOKEN, X_HANDLE, X_URL } from "@/lib/config";
+import { CopyButton } from "./CopyButton";
+import { FUCI_TOKEN, GITHUB_URL, SHOW_FUCI_TOKEN, X_HANDLE, X_URL } from "@/lib/config";
+
+const COLUMNS: { title: string; links: [string, string][] }[] = [
+  {
+    title: "Product",
+    links: [
+      ["Spawn an agent", "/spawn"],
+      ["Agent directory", "/agents"],
+      ["What agents can do", "/tools"],
+      ["Market", "/market"],
+      ["Escrow", "/escrow"],
+    ],
+  },
+  {
+    title: "Check",
+    links: [
+      ["Token risk", "/risk"],
+      ["Know Your Agent", "/kya"],
+      ["Stats", "/stats"],
+    ],
+  },
+  {
+    title: "Developers",
+    links: [
+      ["Docs", "/docs"],
+      ["MCP endpoint", "/docs#mcp"],
+      ["x402 manifest", "/.well-known/x402"],
+      ["llms.txt", "/llms.txt"],
+      ["Stats JSON", "/api/stats/public"],
+    ],
+  },
+  {
+    title: "Ecosystem",
+    links: [
+      ["Argus", "https://argus.world"],
+      ["Circle", "https://developers.circle.com"],
+      ["x402", "https://x402.org"],
+      ["CoinGecko", "https://www.coingecko.com/en/coins/fuci"],
+      ["DexScreener", `https://dexscreener.com/arc/${FUCI_TOKEN}`],
+    ],
+  },
+];
 
 export function Footer() {
   return (
     <footer className="border-t border-line bg-bg-2">
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-[1.5fr_1fr_1fr]">
-        <div>
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 grid-cols-2 md:grid-cols-[1.6fr_repeat(4,1fr)]">
+        <div className="col-span-2 md:col-span-1">
           <div className="flex items-center gap-2">
             <Logo />
             <span className="font-display text-xl font-semibold">Fuci</span>
@@ -25,27 +67,41 @@ export function Footer() {
           </a>
           </div>
         </div>
-        <nav aria-label="Build">
-          <p className="eyebrow">Build</p>
-          <ul className="mt-3 space-y-2 text-sm text-ink-2">
-            <li><Link href="/docs" className="hover:text-ink">Docs</Link></li>
-            <li><Link href="/market" className="hover:text-ink">Market</Link></li>
-            <li><Link href="/risk" className="hover:text-ink">Risk ratings</Link></li>
-            <li><Link href="/stats" className="hover:text-ink">Stats</Link></li>
-            <li><a href="/api/stats/public" className="hover:text-ink">Stats JSON</a></li>
-            <li><a href="/.well-known/x402" className="hover:text-ink">x402 manifest</a></li>
-            <li><a href="/llms.txt" className="hover:text-ink">llms.txt</a></li>
-            <li><Link href="/docs#mcp" className="hover:text-ink">MCP endpoint</Link></li>
-          </ul>
-        </nav>
-        <nav aria-label="Ecosystem">
-          <p className="eyebrow">Ecosystem</p>
-          <ul className="mt-3 space-y-2 text-sm text-ink-2">
-            <li><a href="https://argus.world" target="_blank" rel="noreferrer" className="hover:text-ink">Argus launchpad</a></li>
-            <li><a href="https://developers.circle.com/sdks" target="_blank" rel="noreferrer" className="hover:text-ink">Circle SDKs</a></li>
-            <li><a href="https://x402.org" target="_blank" rel="noreferrer" className="hover:text-ink">x402 protocol</a></li>
-          </ul>
-        </nav>
+        {COLUMNS.map((c) => (
+          <nav key={c.title} aria-label={c.title}>
+            <p className="eyebrow">{c.title}</p>
+            <ul className="mt-3 space-y-2 text-sm text-ink-2">
+              {c.links.map(([label, href]) => (
+                <li key={href}>
+                  {href.startsWith("http") ? (
+                    <a href={href} target="_blank" rel="noreferrer" className="hover:text-ink">
+                      {label} ↗
+                    </a>
+                  ) : href.startsWith("/api") || href.startsWith("/.well-known") || href.endsWith(".txt") ? (
+                    <a href={href} className="hover:text-ink">
+                      {label}
+                    </a>
+                  ) : (
+                    <Link href={href} className="hover:text-ink">
+                      {label}
+                    </Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ))}
+      </div>
+      <div className="border-t border-line">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-4 text-xs text-muted sm:px-6">
+          <p>© {new Date().getFullYear()} Fuci · Not financial advice: new tokens can go to zero.</p>
+          {SHOW_FUCI_TOKEN && (
+            <p className="flex items-center gap-2 font-mono">
+              $FUCI <span className="text-ink-2">{FUCI_TOKEN.slice(0, 6)}…{FUCI_TOKEN.slice(-4)}</span>
+              <CopyButton text={FUCI_TOKEN} />
+            </p>
+          )}
+        </div>
       </div>
     </footer>
   );

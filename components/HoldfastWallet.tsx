@@ -197,55 +197,48 @@ export function HoldfastWallet({
     );
   }
 
+  const connectButton = (
+    <button className={PASSKEY_ENABLED ? "btn btn-ghost" : "btn btn-primary"} disabled={busy !== null} onClick={() => run("browser", connectBrowser)}>
+      {busy === "browser" ? "Check your wallet…" : "Connect wallet"}
+    </button>
+  );
+
   return (
     <div className="space-y-5">
-      <div>
-        <button
-          className="btn btn-primary"
-          disabled={busy !== null}
-          onClick={() => run("browser", connectBrowser)}
-        >
-          {busy === "browser" ? "Check your wallet…" : "Connect wallet"}
-        </button>
-      </div>
-
-      {PASSKEY_ENABLED && (
-        <div className="space-y-3 border-t border-line pt-5">
-          <label className="block text-sm text-ink-2" htmlFor="hf-name">
-            Or use a passkey
-          </label>
-          <input
-            id="hf-name"
-            value={username}
-            onChange={(e) =>
-              setUsername(
-                e.target.value.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32),
-              )
-            }
-            placeholder="passkey name, e.g. tidepool-ana"
-            className="w-full field px-4 py-2.5"
-          />
-          <div className="flex flex-wrap gap-2">
-            <button
-              className="btn btn-ghost"
-              disabled={busy !== null || !username}
-              onClick={() =>
-                run("register", () => connectPasskey("register", username))
-              }
-            >
-              {busy === "register"
-                ? "Waiting for passkey…"
-                : "Create passkey wallet"}
-            </button>
-            <button
-              className="btn btn-ghost"
-              disabled={busy !== null}
-              onClick={() => run("login", () => connectPasskey("login"))}
-            >
-              {busy === "login" ? "Waiting for passkey…" : "I already have one"}
-            </button>
+      {PASSKEY_ENABLED ? (
+        <>
+          {/* No crypto needed: a Circle passkey wallet, unlocked with Face ID, a fingerprint or the device PIN. */}
+          <div className="space-y-3">
+            <label className="block text-sm text-ink" htmlFor="hf-name">
+              No crypto wallet? Create one with Face ID or your fingerprint
+            </label>
+            <input
+              id="hf-name"
+              value={username}
+              onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_@.:+-]/g, "").slice(0, 50))}
+              placeholder="pick a name, e.g. tidepool-ana"
+              className="w-full field px-4 py-2.5"
+              aria-describedby="hf-name-hint"
+            />
+            <p id="hf-name-hint" className="text-xs text-muted">
+              {username && username.length < 5 ? `At least 5 characters (${5 - username.length} more).` : "5 to 50 letters or numbers. Only you see it, in your passkey list."}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button className="btn btn-primary" disabled={busy !== null || username.length < 5} onClick={() => run("register", () => connectPasskey("register", username))}>
+                {busy === "register" ? "Waiting for passkey…" : "Create my wallet"}
+              </button>
+              <button className="btn btn-ghost" disabled={busy !== null} onClick={() => run("login", () => connectPasskey("login"))}>
+                {busy === "login" ? "Waiting for passkey…" : "I already have one"}
+              </button>
+            </div>
           </div>
-        </div>
+          <div className="space-y-2 border-t border-line pt-5">
+            <p className="text-sm text-ink-2">Or connect a wallet you already have (MetaMask, Rabby…)</p>
+            {connectButton}
+          </div>
+        </>
+      ) : (
+        <div>{connectButton}</div>
       )}
       {error && <p className="text-sm text-danger">{error}</p>}
     </div>

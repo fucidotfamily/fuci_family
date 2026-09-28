@@ -1,7 +1,8 @@
 import { FUCI_TOKEN } from "@/lib/config";
 
-/** Where Fuci is listed today (each link checked live). CoinGecko and CoinMarketCap are added once they approve. */
+/** Where Fuci is listed today (each link checked live). CoinMarketCap is added once it approves. */
 const LISTINGS = [
+  { label: "CoinGecko", href: "https://www.coingecko.com/en/coins/fuci" },
   { label: "DefiLlama", href: "https://defillama.com/protocol/fuci" },
   { label: "DexScreener", href: `https://dexscreener.com/arc/${FUCI_TOKEN}` },
   { label: "Argus", href: `https://argus.world/token/${FUCI_TOKEN}` },

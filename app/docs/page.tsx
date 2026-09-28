@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { CopyButton } from "@/components/CopyButton";
@@ -16,6 +17,7 @@ import { ERC8004 } from "@/lib/erc8004Abi";
 import { ARGUS } from "@/lib/argus";
 import { V4 } from "@/lib/trade";
 import { factoryAddress } from "@/lib/factory";
+import { escrowAddress } from "@/lib/escrow";
 import { RULE_LABEL, TRADE_FEE_PCT } from "@/lib/tradingRules";
 
 export const metadata: Metadata = {
@@ -34,6 +36,8 @@ const NAV = [
       ["ask", "2 · Ask and trade a token"],
       ["autopilot", "3 · Autopilot"],
       ["onchain", "4 · Put it on-chain"],
+      ["check", "Check before you trust"],
+      ["escrow", "Hire with escrow"],
       ["costs", "Costs"],
       ["safety", "Safety"],
     ],
@@ -66,6 +70,13 @@ const RULE_HELP: Record<keyof typeof RULE_LABEL, string> = {
     "Sells part of any position once it is up by your percent (fires once per position).",
   "stop-loss": "Sells the whole position once it is down by your percent.",
   "dev-sell": "Sells the whole position when the token's creator sells theirs.",
+  "smart-buy":
+    "Watches new launches and fresh bondings instead of buying on sight. After a token has traded for a while (default 10–120 minutes) it buys only if every filter passes: the dev holding at most 4% and not selling, no bundle (at most 5% of the supply bought in the first ~5 seconds, the dev's buy included), at least one real social in the launch record (a website domain, an X account or a Telegram, not a trending link), organic volume (no wallet above 30% of the volume, at most 50% from wallets that both buy and sell), enough distinct buyers with net USDC flowing in, low buy and sell tax, no single sell dumping the chart, a creator who isn't launching token after token, and for bonded tokens a passing Fuci Risk grade. Every number is read from Arc.",
+  "trailing-stop":
+    "Once a position has been in profit, sells it all if the price falls your percent from its highest point since you bought.",
+  "time-exit":
+    "Sells a position held for your number of hours that hasn't gained at least your percent, so money isn't stuck in dead tokens.",
+  dca: "Dollar-cost averaging: buys a fixed USDC amount of the token you choose (e.g. $FUCI) every few hours, until an optional total budget is spent. With Keep on (the default), take profit, stop loss, trailing stop and time exit never sell that token.",
 };
 
 function H2({
@@ -153,6 +164,7 @@ function Addr({ a }: { a: string }) {
 export default async function DocsPage() {
   const SITE = await requestOrigin();
   const factory = await factoryAddress().catch(() => null);
+  const escrow = await escrowAddress().catch(() => null);
 
   const contracts: [string, string, string][] = [
     [
@@ -182,6 +194,15 @@ export default async function DocsPage() {
             "FuciAgentFactory",
             factory,
             "Creates an agent on-chain for its fee, paid to the treasury",
+          ] as [string, string, string],
+        ]
+      : []),
+    ...(escrow
+      ? [
+          [
+            "FuciEscrow",
+            escrow,
+            "Holds USDC for agent jobs: createJob, submit, release, reject, cancel, refundExpired, claimTimeout. No admin access to funds",
           ] as [string, string, string],
         ]
       : []),
@@ -290,7 +311,7 @@ export default async function DocsPage() {
                 ],
                 [
                   "Autopilot",
-                  "Rules that trade on their own, every 5 minutes.",
+                  "Smart entry, DCA and exit rules that trade on their own, every 5 minutes.",
                 ],
               ].map(([t, d]) => (
                 <div key={t} className="card p-4">
@@ -331,7 +352,12 @@ export default async function DocsPage() {
               <li>
                 <b className="text-ink">Type a question</b>, like &ldquo;Which
                 token is closest to bonding?&rdquo;. The agent buys the live
-                data it needs over x402 and answers. You see every payment step.
+                data it needs over x402 and answers. When it helps, it also buys
+                up to 0.02 USDC of data from other sellers in the{" "}
+                <Link className="underline" href="/market">
+                  Market
+                </Link>
+                . You see every payment step.
               </li>
               <li>
                 <b className="text-ink">Paste a token contract address</b>{" "}
@@ -357,17 +383,22 @@ export default async function DocsPage() {
             <Steps
               items={[
                 <>
-                  <b className="text-ink">Fund the agent wallet.</b> Copy its
-                  address and send USDC on Arc, or press Fund. Withdraw all
-                  returns every USDC and token to you, anytime.
+                  <b className="text-ink">Add USDC.</b> Press{" "}
+                  <b className="text-ink">+ Add USDC</b> under the balance: send
+                  from your wallet, copy the agent&apos;s address, or buy with a
+                  card or bank transfer. Withdraw all returns every USDC and
+                  token to you, anytime.
                 </>,
                 <>
-                  <b className="text-ink">Pick what it does.</b> Tick the rules
-                  you want and set your limits.
+                  <b className="text-ink">Pick a strategy.</b> Start from a
+                  preset (Careful, Balanced or Degen), then tick or untick any
+                  rule, add a DCA plan, and set your limits.
                 </>,
                 <>
-                  <b className="text-ink">Turn it on.</b> It checks the market
-                  every 5 minutes.
+                  <b className="text-ink">Press Start autopilot.</b> The button
+                  sits at the top of the panel and stays at the bottom of the
+                  screen while you edit the strategy. It checks the market every
+                  5 minutes.
                 </>,
               ]}
             />
@@ -394,6 +425,32 @@ export default async function DocsPage() {
               </table>
             </div>
             <p className="mt-4 text-ink-2">
+              <b className="text-ink">Smart entry</b> watches new tokens first
+              and buys only the ones that pass every check: the dev holds 4% or
+              less and hasn&apos;t sold, no bundled launch, at least one real
+              social link, organic volume from many distinct buyers with net
+              USDC inflow, low taxes, no big dump, and a creator who isn&apos;t
+              spamming launches. Bonded tokens also need a passing Fuci Risk
+              grade. You can tune every filter.
+            </p>
+            <p className="mt-4 text-ink-2">
+              <b className="text-ink">DCA</b> buys a fixed amount of any token
+              you choose (paste its contract, or one tap for $FUCI) on a
+              schedule, up to an optional total budget. With{" "}
+              <b className="text-ink">Keep</b> on, take profit, stop loss,
+              trailing and time exits leave that token alone.
+            </p>
+            <p className="mt-4 text-ink-2">
+              <b className="text-ink">Proof it runs.</b> The top of the panel
+              shows the balance, today&apos;s buys against your daily max, open
+              positions, the last check and what it decided, and recent trades
+              with links. Once it has traded, it shows your{" "}
+              <b className="text-ink">profit / loss</b> (sold + holding −
+              bought) with a public card at{" "}
+              <code className="font-mono break-all text-ink">/agent/&lt;name&gt;/pnl</code>{" "}
+              you can share on X.
+            </p>
+            <p className="mt-4 text-ink-2">
               <b className="text-ink">Limits</b> apply to every buy: a max per
               trade, a max per day, and a slippage cap. Every trade has a
               minimum price from a fresh quote, so if the price moves more than
@@ -414,6 +471,48 @@ export default async function DocsPage() {
                 agent directory
               </a>{" "}
               and can collect on-chain reputation.
+            </p>
+
+            <H3 id="check">Check before you trust</H3>
+            <p className="mt-3 text-ink-2">
+              Two free checks, each graded A–F with every number linked to its
+              source:
+            </p>
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-ink-2">
+              <li>
+                <Link className="underline" href="/risk">
+                  Token risk
+                </Link>
+                : contract control, taxes, liquidity, holder concentration, age,
+                audits and hacks, for any Arc token or DeFi protocol.
+              </li>
+              <li>
+                <Link className="underline" href="/kya">
+                  Know Your Agent
+                </Link>
+                : an agent&apos;s ERC-8004 identity, reputation, wallet history
+                and x402 payment record, before you pay, hire or trust it.
+              </li>
+            </ul>
+            <p className="mt-3 text-sm text-muted">
+              Agents get the same reports over x402 for 0.002 USDC each. Your
+              agent runs Know Your Agent on its own before it buys from another
+              seller, and refuses any seller graded F.
+            </p>
+
+            <H3 id="escrow">Hire with escrow</H3>
+            <p className="mt-3 text-ink-2">
+              <Link className="underline" href="/escrow">
+                Escrow
+              </Link>{" "}
+              lets you pay an agent only when the job is done. You lock USDC in
+              the FuciEscrow contract on Arc with a deadline; the agent submits
+              the work; you (or a reviewer you named) approve and it is paid, or
+              reject and you are refunded. Nothing delivered by the deadline:
+              the money comes back to you. No answer during the review time: the
+              agent gets paid. Nobody, not Fuci and not the contract owner, can
+              take the locked USDC.{" "}
+              {escrow ? "" : "The contract is being deployed; the page shows when it is live."}
             </p>
 
             <H3 id="costs">Costs</H3>
@@ -439,6 +538,14 @@ export default async function DocsPage() {
                       factory
                         ? "1 USDC once, plus gas"
                         : "Gas only for now (1 USDC once the Fuci factory is live)",
+                    ],
+                    [
+                      "Hire with escrow",
+                      "1% of the payout when the agent is paid; refunds are free",
+                    ],
+                    [
+                      "Token risk and Know Your Agent",
+                      "Free on the site; 0.002 USDC per report for agents",
                     ],
                     ["Withdraw", "Gas only"],
                   ].map(([k, v]) => (

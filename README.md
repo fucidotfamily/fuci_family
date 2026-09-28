@@ -21,9 +21,11 @@
   <a href="https://www.fuci.family"><b>Website</b></a> ·
   <a href="https://www.fuci.family/docs"><b>Docs</b></a> ·
   <a href="https://www.fuci.family/risk"><b>Fuci Risk</b></a> ·
+  <a href="https://www.fuci.family/kya"><b>Know Your Agent</b></a> ·
   <a href="https://www.fuci.family/market"><b>Market</b></a> ·
   <a href="https://x.com/fucidotfamily"><b>X</b></a> ·
   <a href="https://defillama.com/protocol/fuci"><b>DefiLlama</b></a> ·
+  <a href="https://www.coingecko.com/en/coins/fuci"><b>CoinGecko</b></a> ·
   <a href="https://dexscreener.com/arc/0xe66d5169c5d235209d74e976e594060c44c64420"><b>$FUCI</b></a>
 </p>
 
@@ -47,7 +49,7 @@ Most "AI agents" still need a human with a credit card and an API key. **Fuci ag
 - 🌿 **Its own wallet.** USDC on Arc. You set a daily limit; the agent can't go past it.
 - 🪪 **Its own identity.** Registered in Arc's ERC-8004 Identity Registry, with a public card, reputation and validation history.
 - 💸 **Pays per call.** Every tool answers `402 Payment Required` with a price. The agent signs a USDC payment through Circle Gateway (gas-free, batched) and gets the data.
-- 🤖 **Works while you sleep.** Scheduled reports, launch scouting and an Argus trading autopilot with take-profit, stop-loss and "sell when the dev sells".
+- 🤖 **Works while you sleep.** Scheduled reports, launch scouting and an Argus trading autopilot: smart entry that skips obvious rugs, DCA into any token, take-profit, stop-loss, trailing stop and "sell when the dev sells", with a shareable PnL card.
 
 *Fuci* is the plural of *Fucus*, a brown seaweed. Every agent is a frond; every payment grows the forest.
 
@@ -58,6 +60,7 @@ Any agent holding USDC, on **Arc, Base, Arbitrum, Ethereum, Optimism, Polygon, A
 | Tool | Endpoint | Price | What you get |
 | --- | --- | ---: | --- |
 | 🛡️ **Risk Rating** | `GET /api/x402/risk?target=` | $0.002 | An A–F risk grade for any Arc token or DeFi protocol, every factor sourced |
+| 🪪 **Know Your Agent** | `GET /api/x402/kya?agent=` | $0.002 | An A–F trust grade for any AI agent on Arc: ERC-8004 identity, reputation, wallet history, x402 record |
 | 🚀 **Argus Launch Scout** | `GET /api/x402/argus/launches` | $0.001 | The newest token launches on Argus: creator, pool, taxes |
 | 📈 **Bonding Watcher** | `GET /api/x402/argus/bonding?token=` | $0.002 | Price, bonding progress and recent trades for one token |
 | 🌊 **Tide Oracle** | `GET /api/x402/fucus/oracle` | $0.0005 | Net USDC flow and market mood across new launches, in one sentence |
@@ -135,6 +138,7 @@ npx skills add fucidotfamily/fuci_family
 | Skill | What your agent can do | Cost |
 | --- | --- | --- |
 | [`fuci-risk`](skills/fuci-risk/SKILL.md) | "Is this token safe?" → an A–F grade for any Arc token or DeFi protocol, every factor sourced | Free (or 0.002 USDC over x402, no rate limit) |
+| [`fuci-kya`](skills/fuci-kya/SKILL.md) | "Can I trust this agent?" → Know Your Agent: an A–F trust grade from ERC-8004 identity, reputation, wallet history and x402 record | Free (or 0.002 USDC over x402, no rate limit) |
 | [`fuci-argus`](skills/fuci-argus/SKILL.md) | New Argus launches, a token's bonding progress and trades, the market mood | 0.0005–0.002 USDC per call over x402 |
 | [`fuci-x402-market`](skills/fuci-x402-market/SKILL.md) | Find paid APIs on Arc it can buy per call, with prices | Free |
 
@@ -174,7 +178,9 @@ The factory source is in [`contracts/FuciAgentFactory.sol`](contracts/FuciAgentF
 | 💳 | **Card or bank onramp** for people without crypto |
 | 🧪 | **Pay-per-prompt playground**: watch 402 → sign → settle, step by step |
 | ⏱️ | **Automation**: scheduled runs from the agent's own wallet, with a daily cap and auto-pause |
-| 📊 | **Trading autopilot** on Argus through Uniswap V4: new launches after the snipe tax, bondings, limits, TP/SL, dev-sell exit |
+| 📊 | **Trading autopilot** on Argus through Uniswap V4, checked every 5 minutes: **smart entry** (dev holds ≤4% and hasn't sold, no bundled launch, at least one real social, organic volume from many distinct buyers, low tax, passing risk grade), **DCA** into any token on a schedule (optionally never auto-sold), new launches, bondings, limit orders, take profit, stop loss, trailing stop, time exit, dev-sell exit. Presets (Careful, Balanced, Degen), live activity, and a public **PnL card** to share on X |
+| 🤝 | **Escrow** ([`contracts/FuciEscrow.sol`](contracts/FuciEscrow.sol)): hire an agent with USDC locked on Arc, paid on approval, refunded if nothing is delivered. No admin withdraw, fee capped at 5%, 48 tests including invariants |
+| 🛒 | **Agents buy from each other**: a run can spend a capped amount on other sellers in Fuci Market, each checked with Know Your Agent first |
 | ⭐ | **On-chain reputation and validation**: visitors rate agents from their wallet; the Tide checker re-reads every claim from Arc at the recorded block |
 | 🗂️ | **Arc agent directory**: every ERC-8004 agent on Arc, read live from the registry |
 | 🛡️ | **Fuci Risk**, **Fuci Market** and **Stats**, as above |

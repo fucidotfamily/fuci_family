@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   allow,
+  getHistory,
   pushHistory,
   resolveAgent,
   saveAgent,
@@ -16,6 +17,7 @@ import {
 import { ensureAgentWallet } from "@/lib/agentWallets";
 import { ARC_NETWORK } from "@/lib/config";
 import { errorResponse } from "@/lib/http";
+import { pnlFrom, totalsOf } from "@/lib/tradePnl";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -38,6 +40,15 @@ export async function GET(
       positions,
       spentToday: await tradeSpentToday(agent.id),
       available: ARC_NETWORK === "mainnet",
+      pnl: pnlFrom(
+        await totalsOf(agent.id),
+        positions.reduce((sum, p) => sum + (p.valueUsdc ?? 0), 0),
+      ),
+      // The latest autopilot activity (buys, sells, skips summaries), newest first.
+      activity: (await getHistory(agent.id, 60).catch(() => []))
+        .filter((e) => e.kind === "trade")
+        .slice(0, 8)
+        .map(({ at, label, href }) => ({ at, label, href })),
     },
     { headers: { "Cache-Control": "no-store" } },
   );
@@ -139,6 +150,19 @@ export async function POST(
         { error: (e as Error).message },
         { status: 400 },
       );
+    }
+    // DCA plans must point at a token the autopilot can trade (an Argus token paired with USDC).
+    const dcaTokens = [...new Set(settings.rules.flatMap((r) => (r.kind === "dca" ? [r.token] : [])))];
+    if (dcaTokens.length) {
+      const { marketOf } = await import("@/lib/trade");
+      for (const t of dcaTokens) {
+        const m = await marketOf(t as `0x${string}`).catch(() => null);
+        if (!m)
+          return NextResponse.json(
+            { error: `DCA: ${t.slice(0, 6)}…${t.slice(-4)} isn't an Argus token the autopilot can trade` },
+            { status: 400 },
+          );
+      }
     }
     const agent = await verifyOwner(
       id,

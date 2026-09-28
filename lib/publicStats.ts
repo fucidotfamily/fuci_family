@@ -1,6 +1,7 @@
 import { FUCI_LAUNCH, FUCI_TOKEN, FUCI_TREASURY, GITHUB_URL, X_URL } from "./config";
 import { ERC8004 } from "./erc8004Abi";
 import { factoryAddress } from "./factory";
+import { escrowInfo } from "./escrow";
 import { getForest, treasuryBalance, type ForestEvent } from "./forest";
 import { storedIndex } from "./agentIndex";
 import { getStats, kvGet, kvSet } from "./store";
@@ -28,6 +29,8 @@ export type PublicStats = {
     sellTaxPct: number;
     market: Market | null;
   };
+  /** FuciEscrow: USDC locked for agent jobs (Fuci's TVL); null until it is deployed. */
+  escrow: { address: string; lockedUsdc: number; jobs: number } | null;
   contracts: { label: string; address: string }[];
   links: { label: string; url: string }[];
   recent: ForestEvent[];
@@ -66,13 +69,14 @@ export async function fuciMarket(): Promise<Market | null> {
 const orNull = <T>(p: Promise<T>) => p.catch(() => null);
 
 export async function getPublicStats(): Promise<PublicStats> {
-  const [forest, stats, index, treasury, mkt, factory] = await Promise.all([
+  const [forest, stats, index, treasury, mkt, factory, escrow] = await Promise.all([
     orNull(getForest()),
     orNull(getStats()),
     orNull(storedIndex()),
     orNull(treasuryBalance()),
     orNull(fuciMarket()),
     orNull(factoryAddress()),
+    orNull(escrowInfo()),
   ]);
   const f = forest?.forest;
   const creation = f?.creationFeesUsdc ?? 0;
@@ -83,6 +87,7 @@ export async function getPublicStats(): Promise<PublicStats> {
     { label: "$FUCI token", address: FUCI_TOKEN },
     { label: "ERC-8004 Identity Registry", address: ERC8004.identity },
     { label: "ERC-8004 Reputation Registry", address: ERC8004.reputation },
+    ...(escrow ? [{ label: "FuciEscrow (agent jobs)", address: escrow.address }] : []),
   ];
   return {
     asOf: new Date().toISOString(),
@@ -94,8 +99,10 @@ export async function getPublicStats(): Promise<PublicStats> {
     trading: { trades: f?.trades ?? 0, feesUsdc: tradeFees },
     revenue: { creationFeesUsdc: creation, tradeFeesUsdc: tradeFees, totalUsdc: creation + tradeFees, treasuryUsdc: treasury?.usdc ?? null, treasury: treasury?.address ?? FUCI_TREASURY },
     token: { address: FUCI_TOKEN, supply: FUCI_LAUNCH.supply, buyTaxPct: FUCI_LAUNCH.buyTaxPct, sellTaxPct: FUCI_LAUNCH.sellTaxPct, market: mkt },
+    escrow: escrow ? { address: escrow.address, lockedUsdc: escrow.lockedUsdc, jobs: escrow.jobs } : null,
     contracts,
     links: [
+      { label: "CoinGecko", url: "https://www.coingecko.com/en/coins/fuci" },
       { label: "DefiLlama", url: "https://defillama.com/protocol/fuci" },
       { label: "DexScreener", url: `https://dexscreener.com/arc/${FUCI_TOKEN}` },
       { label: "Argus", url: `https://argus.world/token/${FUCI_TOKEN}` },

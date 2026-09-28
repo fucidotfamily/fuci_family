@@ -5,10 +5,22 @@ const ICON: Record<HistoryEvent["kind"], string> = { spawn: "✦", run: "◎", p
 const when = (at: number) => new Date(at).toISOString().slice(0, 16).replace("T", " ") + " UTC";
 
 /** The agent's history, with explorer links for on-chain transactions. */
-export function AgentHistory({ events }: { events: HistoryEvent[] }) {
+export function AgentHistory({ events, agentId }: { events: HistoryEvent[]; agentId: string }) {
+  const paid = events.filter((e) => e.kind === "payment" && e.usdc && !/^Moved /.test(e.label));
+  const total = paid.reduce((s, e) => s + (e.usdc ?? 0), 0);
   return (
     <section className="card mt-6 p-6 sm:p-8">
-      <p className="eyebrow">History</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="eyebrow">History</p>
+        <a href={`/api/agent/${agentId}/receipts`} className="btn btn-ghost !py-1.5 text-xs" download>
+          Download receipts (CSV)
+        </a>
+      </div>
+      {paid.length > 0 && (
+        <p className="mt-2 text-sm text-ink-2">
+          {paid.length} paid call{paid.length === 1 ? "" : "s"} · <b className="font-mono text-ink">{Number(total.toFixed(6))} USDC</b> spent (latest 200 events)
+        </p>
+      )}
       <ol className="mt-4 space-y-3">
         {events.map((e, i) => (
           <li key={i} className="flex items-start gap-3 text-sm">

@@ -28,7 +28,7 @@ export function RiskReportView({ r }: { r: RiskReport }) {
           {r.score !== null && <span className="mt-1 font-mono text-xs">{r.score}/100</span>}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="eyebrow">{r.kind === "token" ? "Token on Arc" : "DeFi protocol"}</p>
+          <p className="eyebrow">{r.kind === "token" ? "Token on Arc" : r.kind === "agent" ? "Know Your Agent · ERC-8004 on Arc" : "DeFi protocol"}</p>
           <h2 id="risk-name" className="font-display mt-1 truncate text-3xl font-semibold tracking-tight">
             {r.name}
             {r.symbol && r.symbol !== r.name ? <span className="text-ink-2"> · {r.symbol}</span> : null}

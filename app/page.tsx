@@ -10,6 +10,7 @@ import { liveFeedNow } from "@/lib/feed";
 import { storedIndex } from "@/lib/agentIndex";
 import { getForest, refreshForest } from "@/lib/forest";
 import { after } from "next/server";
+import { escrowAddress } from "@/lib/escrow";
 import type { Forest } from "@/lib/forest";
 
 const EMPTY_FOREST: Forest = {
@@ -49,11 +50,12 @@ async function safeAsync(name: string, render: () => Promise<React.ReactNode>) {
 
 export default async function Home() {
   // A real agent card for the hero, and the size of the Arc agent registry.
-  const [stats, index, forest, feed] = await Promise.all([
+  const [stats, index, forest, feed, escrow] = await Promise.all([
     getStats().catch(() => null),
     storedIndex().catch(() => null),
     getForest().catch(() => ({ forest: EMPTY_FOREST, stale: true })),
     liveFeedNow(),
+    escrowAddress().catch(() => null),
   ]);
   // Keep the on-chain numbers fresh without making this page wait.
   if (forest.stale) after(() => refreshForest().catch(() => undefined));
@@ -94,7 +96,7 @@ export default async function Home() {
         }),
       )}
       <HowItWorks />
-      <Capabilities />
+      <Capabilities escrowLive={Boolean(escrow)} />
       {SHOW_FUCI_TOKEN && (await safeAsync("fuci", () => FuciToken()))}
     </main>
   );

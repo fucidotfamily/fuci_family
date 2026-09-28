@@ -18,7 +18,66 @@ export type TradeRule =
   /** Sell a whole position once it is down `pct`%. */
   | { id: string; kind: "stop-loss"; pct: number }
   /** Sell a whole position when the token's dev sells. */
-  | { id: string; kind: "dev-sell" };
+  | { id: string; kind: "dev-sell" }
+  /**
+   * Smart entry: watch new launches and/or fresh bondings, and buy only the ones that pass every
+   * filter after they have traded for a while (see lib/tradeSignals.ts).
+   */
+  | ({ id: string; kind: "smart-buy"; usdc: number } & SmartFilters)
+  /** Once a position has been in profit, sell it all if the price falls `pct`% from its peak. */
+  | { id: string; kind: "trailing-stop"; pct: number }
+  /** Sell a whole position held for `hours` that is not up at least `minGainPct`%. */
+  | { id: string; kind: "time-exit"; hours: number; minGainPct: number }
+  /**
+   * DCA: buy `usdc` of `token` every `everyHours`, until `totalUsdc` has been spent (0 = no cap).
+   * With `hold`, the automatic exits never sell this token.
+   */
+  | { id: string; kind: "dca"; token: string; usdc: number; everyHours: number; totalUsdc: number; hold: boolean };
+
+export type SmartFilters = {
+  /** Which tokens to watch. */
+  source: "launches" | "bonded" | "both";
+  /** Only consider a token between these ages (minutes since launch or bonding). */
+  minAgeMin: number;
+  maxAgeMin: number;
+  /** Distinct wallets that bought. */
+  minBuyers: number;
+  /** USDC bought minus USDC sold. */
+  minNetUsdc: number;
+  /** Most of the supply the creator may hold (%). */
+  maxDevPct: number;
+  maxBuyTaxPct: number;
+  maxSellTaxPct: number;
+  /** Skip creators with more launches than this in the last 24 hours (serial launchers). */
+  maxCreatorLaunches: number;
+  /** Bonded tokens only: the lowest Fuci Risk grade to accept. */
+  minGrade: "A" | "B" | "C" | "D";
+  /** Real socials in the launch record (website, X account, Telegram). */
+  minSocials: number;
+  /** Most of the supply bought in the first ~5 seconds after launch (bundled snipes, the dev's included). */
+  maxBundlePct: number;
+  /** Organic volume: most of the volume one wallet may account for. */
+  maxTopWalletPct: number;
+  /** Organic volume: most of the volume from wallets that both bought and sold (wash trading). */
+  maxRoundTripPct: number;
+};
+
+export const SMART_DEFAULTS: SmartFilters = {
+  source: "both",
+  minAgeMin: 10,
+  maxAgeMin: 120,
+  minBuyers: 8,
+  minNetUsdc: 20,
+  maxDevPct: 4,
+  maxBuyTaxPct: 5,
+  maxSellTaxPct: 5,
+  maxCreatorLaunches: 3,
+  minGrade: "C",
+  minSocials: 1,
+  maxBundlePct: 5,
+  maxTopWalletPct: 30,
+  maxRoundTripPct: 50,
+};
 
 export type TradeRuleKind = TradeRule["kind"];
 
@@ -32,6 +91,8 @@ export type Trading = {
   rules: TradeRule[];
   failures: number;
   lastRunAt?: number;
+  /** What the last check found, in one line (shown on the agent page). */
+  lastResult?: string;
   pausedReason?: string;
 };
 
@@ -45,6 +106,10 @@ export const RULE_LABEL: Record<TradeRuleKind, string> = {
   "take-profit": "Take profit",
   "stop-loss": "Stop loss",
   "dev-sell": "Sell when dev sells",
+  "smart-buy": "Smart entry",
+  "trailing-stop": "Trailing stop",
+  "time-exit": "Time exit",
+  dca: "DCA",
 };
 
 /** Argus launches set their own buy tax (up to 10%): by default, skip anything above this. */
@@ -108,6 +173,48 @@ export function normalizeTrading(s: Partial<TradingSettings>): TradingSettings {
         return { id, kind: r.kind, pct: pct(r.pct, 1, 99) };
       case "dev-sell":
         return { id, kind: r.kind };
+      case "smart-buy": {
+        const whole = (v: unknown, min: number, max: number, what: string) => {
+          const n = num(v, min, max, 0);
+          if (n === null) throw new Error(`Smart entry: ${what} must be ${min}–${max}`);
+          return n;
+        };
+        const minAgeMin = whole(r.minAgeMin, 2, 720, "the earliest age (minutes)");
+        const maxAgeMin = whole(r.maxAgeMin, 5, 1440, "the latest age (minutes)");
+        if (maxAgeMin <= minAgeMin) throw new Error("Smart entry: the latest age must be after the earliest");
+        const source = r.source === "launches" || r.source === "bonded" ? r.source : "both";
+        const minGrade = (["A", "B", "C", "D"] as const).includes(r.minGrade as "A") ? r.minGrade : "C";
+        return {
+          id,
+          kind: r.kind,
+          usdc: usdc(r.usdc),
+          source,
+          minAgeMin,
+          maxAgeMin,
+          minBuyers: whole(r.minBuyers, 1, 500, "the minimum buyers"),
+          minNetUsdc: whole(r.minNetUsdc, 0, 100000, "the minimum net buying (USDC)"),
+          maxDevPct: pct(r.maxDevPct, 0, 100),
+          maxBuyTaxPct: pct(r.maxBuyTaxPct, 0, 10),
+          maxSellTaxPct: pct(r.maxSellTaxPct, 0, 10),
+          maxCreatorLaunches: whole(r.maxCreatorLaunches, 1, 1000, "the creator launch limit"),
+          minGrade,
+          minSocials: whole(r.minSocials ?? SMART_DEFAULTS.minSocials, 0, 3, "the minimum socials"),
+          maxBundlePct: pct(r.maxBundlePct ?? SMART_DEFAULTS.maxBundlePct, 0, 100),
+          maxTopWalletPct: pct(r.maxTopWalletPct ?? SMART_DEFAULTS.maxTopWalletPct, 1, 100),
+          maxRoundTripPct: pct(r.maxRoundTripPct ?? SMART_DEFAULTS.maxRoundTripPct, 0, 100),
+        };
+      }
+      case "dca": {
+        const everyHours = num(r.everyHours, 1, 720, 0);
+        if (everyHours === null) throw new Error("DCA: buy every 1–720 hours");
+        const totalUsdc = num(r.totalUsdc ?? 0, 0, 1_000_000, 2);
+        if (totalUsdc === null) throw new Error("DCA: total budget must be 0 (no cap) or more");
+        return { id, kind: r.kind, token: token(r.token), usdc: usdc(r.usdc), everyHours, totalUsdc, hold: r.hold !== false };
+      }
+      case "trailing-stop":
+        return { id, kind: r.kind, pct: pct(r.pct, 2, 90) };
+      case "time-exit":
+        return { id, kind: r.kind, hours: num(r.hours, 1, 720, 0) ?? (() => { throw new Error("Time exit: hours must be 1–720"); })(), minGainPct: pct(r.minGainPct ?? 0, 0, 1000) };
       default:
         throw new Error("Unknown rule");
     }

@@ -188,6 +188,13 @@ export default async function RiskPage({ searchParams }: Props) {
             For agents: the same report over x402 for 0.002 USDC at <code className="font-mono text-ink">/api/x402/risk?target=…</code>, or the <code className="font-mono text-ink">fuci_risk</code>{" "}
             MCP tool. <Link href="/docs" className="underline underline-offset-2">Docs</Link>
           </p>
+          <p className="mt-2 text-sm text-ink-2">
+            Checking an AI agent instead of a token?{" "}
+            <Link href="/kya" className="underline underline-offset-2">
+              Know Your Agent
+            </Link>{" "}
+            grades its on-chain identity, reputation and wallet history.
+          </p>
         </section>
       </div>
     </main>

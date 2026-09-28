@@ -13,6 +13,7 @@ import {
 import { OwnerError, verifyOwner } from "@/lib/ownerAuth";
 import {
   GAS_RESERVE,
+  GATEWAY_TOPUP,
   agentGatewayFor,
   balancesOf,
   ensureAgentWallet,
@@ -83,7 +84,7 @@ export async function POST(
       if (gatewayUsdc < price) {
         const topUp =
           Math.floor(
-            Math.min(walletUsdc - GAS_RESERVE, Math.max(left, price)) * 1e6,
+            Math.min(walletUsdc - GAS_RESERVE, left, Math.max(GATEWAY_TOPUP, price)) * 1e6,
           ) / 1e6;
         if (topUp < price)
           return NextResponse.json(

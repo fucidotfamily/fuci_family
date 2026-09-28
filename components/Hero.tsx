@@ -30,7 +30,8 @@ export function Hero({
   trades: number;
   proof: Proof;
 }) {
-  const onramp = useOnrampEnabled();
+  // "No crypto?" needs both halves: a passkey wallet to create, and the card/bank onramp to fund it.
+  const onramp = useOnrampEnabled() && Boolean(process.env.NEXT_PUBLIC_CIRCLE_CLIENT_KEY);
   // The kelp grows with the number of agents on Arc (read from the registry).
   const fronds = agentsOnArc ? Math.min(60, Math.round(agentsOnArc / 4)) : 0;
 
@@ -65,9 +66,9 @@ export function Hero({
             AI agents that pay their own way.
           </h1>
           <p className="mt-6 max-w-lg text-lg text-ink-2">
-            Spawn an agent in a minute. It gets its own USDC wallet, works on
-            your schedule and pays per call over x402. No API keys, no
-            subscriptions.
+            Spawn an agent in a minute. It gets its own USDC wallet, trades
+            Argus on autopilot and buys the data it needs per call over x402.
+            No API keys, no subscriptions.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/spawn" className="btn btn-primary">

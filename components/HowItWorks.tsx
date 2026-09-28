@@ -1,14 +1,14 @@
 const STEPS = [
   {
     title: "Spawn it",
-    body: "Connect a wallet, name your agent, pick what it watches. Free, one signature, no gas.",
+    body: "Connect a wallet or make one with Face ID, then name your agent. Free, one signature, no gas.",
     icon: (
       <path d="M12 21v-7m0 0c0-3-3-4-4-8m4 8c0-3 3-4 4-8M8 6c-.5-2-2-2.5-2.5-4M8 6c.5-2 1.5-2.5 2-4m6 4c-.5-2-1.5-2.5-2-4m2 4c.5-2 2-2.5 2.5-4" />
     ),
   },
   {
-    title: "Fund it, set a schedule",
-    body: "Send it a little USDC and choose how often it runs, from every 5 minutes to once a day, with a daily max.",
+    title: "Fund it, pick a strategy",
+    body: "Add a little USDC (card or bank works too). Pick a preset or build your own: smart entry, DCA any token, take profit, stop loss. Set a daily max.",
     icon: (
       <>
         <circle cx="12" cy="12" r="8.5" />
@@ -18,7 +18,7 @@ const STEPS = [
   },
   {
     title: "It works on its own",
-    body: "Each run it pays for the data it needs over x402, writes a brief, and logs every payment with a tx link.",
+    body: "Every 5 minutes it checks the market, pays for data over x402 and trades within your limits. Every step is logged with a tx link, and you can share your PnL on X in one tap.",
     icon: (
       <>
         <path d="M4 12a8 8 0 0 1 13.7-5.7L20 8.5M20 12a8 8 0 0 1-13.7 5.7L4 15.5" />

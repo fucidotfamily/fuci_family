@@ -76,6 +76,8 @@ const ERC20_TRANSFER = [
 
 /** Keep this much USDC in the agent wallet for gas (USDC is Arc's gas token). */
 export const GAS_RESERVE = 0.01;
+/** Most USDC moved into Gateway at once for x402 payments (25 answers, or hundreds of reports), so trading keeps the rest. */
+export const GATEWAY_TOPUP = 1;
 
 /** Send everything back to the owner: the Gateway balance (instant transfer) and the wallet's USDC minus gas. */
 export async function withdrawAll(agentId: string, to: Address) {

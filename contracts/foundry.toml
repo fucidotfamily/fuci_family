@@ -1,0 +1,20 @@
+# Contract tests: forge test --root contracts   (needs forge-std in contracts/lib, see contracts/README.md)
+[profile.default]
+src = "."
+test = "test"
+out = "out"
+cache_path = "cache"
+libs = ["lib"]
+solc = "0.8.28"
+optimizer = true
+optimizer_runs = 200
+evm_version = "cancun"
+skip = ["lib/**"]
+
+[fuzz]
+runs = 5000
+
+[invariant]
+runs = 256
+depth = 60
+fail_on_revert = false

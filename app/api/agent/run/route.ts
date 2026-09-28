@@ -18,7 +18,8 @@ export const POST = paid(toolById("fuci_agent")!, async (req: NextRequest) => {
   const card = body.agentId ? await getAgent(String(body.agentId).slice(0, 40)).catch(() => null) : null;
   const strategy = STRATEGIES.includes(body.strategy as Strategy) ? (body.strategy as Strategy) : card?.strategy;
   const prompt = (body.prompt ?? "").slice(0, 500) || card?.mission || "What is happening on Argus right now?";
-  const result = await runAgent({ origin: req.nextUrl.origin, prompt, strategy });
+  // The $0.04 answer covers Fuci's tools plus up to 0.02 USDC from other sellers in Fuci Market.
+  const result = await runAgent({ origin: req.nextUrl.origin, prompt, strategy, maxSpendUsdc: 0.025, marketUsdc: 0.02 });
   await recordEvent({ kind: "agent_run", agent: result.agent, usdc: result.spentUsdc });
   const ok = Object.keys(result.data).length > 0;
   return NextResponse.json(result, { status: ok ? 200 : 502 });

@@ -22,6 +22,8 @@ import { X_ENABLED } from "@/lib/xAuth";
 import { Suspense } from "react";
 import { defaultDescription, strategyName } from "@/lib/strategy";
 import { createdWithFuci } from "@/lib/forest";
+import { totalsOf } from "@/lib/tradePnl";
+import { OnchainPrompt } from "@/components/OnchainPrompt";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +57,8 @@ export default async function AgentPage({ params }: Props) {
   const born = new Date(a.createdAt).toISOString().slice(0, 10);
   const history = await agentHistory(a);
   const withFuci = await createdWithFuci(a).catch(() => false);
+  const onChain = a.erc8004Id !== undefined;
+  const traded = ((await totalsOf(a.id).catch(() => null))?.buys ?? 0) > 0;
 
   return (
     <main className="depth min-h-dvh">
@@ -71,6 +75,9 @@ export default async function AgentPage({ params }: Props) {
                 <span className="rounded border border-up px-2 py-0.5 font-mono text-[11px] uppercase tracking-widest text-up">
                   Auto · every {a.automation.everyMinutes < 60 ? `${a.automation.everyMinutes}m` : a.automation.everyMinutes < 1440 ? `${a.automation.everyMinutes / 60}h` : "day"}
                 </span>
+              )}
+              {a.trading?.enabled && (
+                <span className="rounded border border-up px-2 py-0.5 font-mono text-[11px] uppercase tracking-widest text-up">Autopilot on</span>
               )}
             </div>
             <div className="mt-4 flex items-center gap-4 sm:gap-6">
@@ -137,6 +144,11 @@ export default async function AgentPage({ params }: Props) {
               >
                 Share on X
               </a>
+              {traded && (
+                <Link className="rounded-md border border-line px-2 py-1 font-mono text-[11px] text-ink-2 hover:border-ink hover:text-ink" href={`/agent/${a.id}/pnl`}>
+                  Autopilot PnL →
+                </Link>
+              )}
               <Suspense>
                 <XConnect agent={{ id: a.id, owner: a.owner, ownerKind: a.ownerKind }} connected={Boolean(a.x)} enabled={X_ENABLED} />
               </Suspense>
@@ -145,10 +157,18 @@ export default async function AgentPage({ params }: Props) {
         </div>
 
 
+        {!onChain && (
+          <OwnerOnly owner={a.owner}>
+            <OnchainPrompt agentId={a.id} createdAt={a.createdAt} fee="1 USDC once">
+              <RegisterIdentity id={a.id} name={a.name} owner={a.owner} ownerKind={a.ownerKind} cardUri={`${SITE_URL}/api/agent/${a.id}/card`} />
+            </OnchainPrompt>
+          </OwnerOnly>
+        )}
+
         <AgentWork agent={{ id: a.id, owner: a.owner, ownerKind: a.ownerKind }} name={a.name} defaultStrategy={a.strategy} />
 
         <OwnerOnly owner={a.owner}>
-          <AgentHistory events={history} />
+          <AgentHistory events={history} agentId={a.id} />
         </OwnerOnly>
 
         <section className="card mt-6 p-6 sm:p-8">
@@ -160,8 +180,8 @@ export default async function AgentPage({ params }: Props) {
               defaultDescription={defaultDescription(a)}
               registered={a.erc8004Id !== undefined}
             />
-            {a.erc8004Id === undefined ? (
-              <RegisterIdentity id={a.id} name={a.name} owner={a.owner} ownerKind={a.ownerKind} cardUri={`${SITE_URL}/api/agent/${a.id}/card`} />
+            {!onChain ? (
+              <p className="mt-4 text-sm text-ink-2">Not on-chain yet. The owner can create its identity from the top of this page.</p>
             ) : (
               <Erc8004Panel agentId={a.erc8004Id} tag2={a.strategy} />
             )}

@@ -56,6 +56,8 @@ export type Automation = {
   everyMinutes: number;
   strategy: Strategy;
   prompt: string;
+  /** Owner opted in: runs may also buy from other sellers in Fuci Market (lib/marketBuy.ts). */
+  market?: boolean;
   nextRunAt: number;
   lastRunAt?: number;
   failures: number;
@@ -115,6 +117,7 @@ const K = {
   tradeFees: "fuci:v2:trade-fees", // integer micro-USDC, all time
   trading: "fuci:v2:trading", // set of agent ids with trading on
   list: (key: string) => `fuci:v2:list:${key}`,
+  payers: "fuci:v2:payers", // hash "<payer>:calls|micro|first|last" -> x402 track record per paying wallet
 };
 
 type Mem = {
@@ -163,6 +166,12 @@ export async function recordEvent(e: Omit<TideEvent, "at">) {
     }
     p.lpush(K.events, JSON.stringify(ev));
     p.ltrim(K.events, 0, 49);
+    if (isPayment && e.payer) {
+      p.hincrby(K.payers, `${e.payer}:calls`, 1);
+      p.hincrby(K.payers, `${e.payer}:micro`, micro);
+      p.hsetnx(K.payers, `${e.payer}:first`, ev.at);
+      p.hset(K.payers, { [`${e.payer}:last`]: ev.at });
+    }
     await p.exec();
   } else {
     if (isPayment) {
@@ -173,6 +182,22 @@ export async function recordEvent(e: Omit<TideEvent, "at">) {
     mem.events.length = Math.min(mem.events.length, 50);
   }
   if (isPayment && e.agent) await bumpAgent(e.agent, e.usdc);
+}
+
+export type PayerRecord = { calls: number; usdc: number; firstAt: number | null; lastAt: number | null };
+
+/** Paid x402 calls Fuci has settled from one wallet (counted since this record was added). */
+export async function payerRecord(payer: string): Promise<PayerRecord> {
+  const a = payer.toLowerCase();
+  if (!redis) {
+    const mine = mem.events.filter((e) => e.kind === "payment" && e.payer === a);
+    return { calls: mine.length, usdc: mine.reduce((s, e) => s + e.usdc, 0), firstAt: mine.at(-1)?.at ?? null, lastAt: mine[0]?.at ?? null };
+  }
+  const [calls, micro, first, last] = await redis.hmget<Record<string, number | string | null>>(K.payers, `${a}:calls`, `${a}:micro`, `${a}:first`, `${a}:last`).then((r) =>
+    r ? [r[`${a}:calls`], r[`${a}:micro`], r[`${a}:first`], r[`${a}:last`]] : [null, null, null, null],
+  );
+  const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+  return { calls: n(calls) ?? 0, usdc: (n(micro) ?? 0) / 1e6, firstAt: n(first), lastAt: n(last) };
 }
 
 export async function recordLaunchesScanned(n: number) {

@@ -9,7 +9,7 @@ const GUIDANCE =
   "Fuci sells on-chain data about Arc to AI agents, paid per call in USDC over x402 (Circle Gateway, gas-free for the buyer; pay from Arc, Base, Arbitrum, Ethereum, Optimism, Polygon, Avalanche and more). " +
   "Every paid call first returns 402 with the price; pay and retry to get JSON. " +
   "Use argus_launches for the newest token launches on Argus (Arc's launchpad), argus_bonding for one token's price, bonding progress and recent trades, " +
-  "fucus_oracle for a one-sentence market mood, and fuci_risk for an A–F risk grade of any Arc token (0x address) or DeFi protocol (DefiLlama slug) before allocating capital. " +
+  "fucus_oracle for a one-sentence market mood, and fuci_risk for an A–F risk grade of any Arc token (0x address) or DeFi protocol (DefiLlama slug) before allocating capital, and fuci_kya (Know Your Agent) for an A–F trust grade of another agent (ERC-8004 id or wallet) before paying, hiring or trusting it. " +
   "fuci_agent answers a free-text question by buying the tools it needs. All data is read live from Arc and public sources; unknown values are reported as unknown, never guessed.";
 
 /** What every tool returns around its data. */
@@ -47,6 +47,11 @@ const RESPONSES: Record<string, Record<string, unknown>> = {
     type: "object",
     description:
       "A risk report: grade (A–F or null), score 0–100, label, confidence, redFlags, limits (rules capping the grade), factors (each with score, summary, details and sources).",
+  },
+  fuci_kya: {
+    type: "object",
+    description:
+      "A Know Your Agent report: grade (A–F or null), score 0–100, label, confidence, redFlags, limits, factors (identity, registration, reputation, validation, activity, funds, payments, each with score, summary, details and sources) and subject (agentId, name, owner, wallet, cardUrl, x402Support, otherAgentIds).",
   },
   fuci_agent: {
     type: "object",

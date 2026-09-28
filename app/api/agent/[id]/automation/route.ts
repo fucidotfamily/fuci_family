@@ -149,6 +149,7 @@ export async function POST(
         .trim()
         .slice(0, 200),
       dailyLimitUsdc: Math.round(Number(s.dailyLimitUsdc) * 100) / 100,
+      market: s.market === true,
     };
     if (
       !(AUTOMATION_INTERVALS as readonly number[]).includes(
@@ -181,6 +182,7 @@ export async function POST(
       everyMinutes: settings.everyMinutes,
       strategy: settings.strategy as Strategy,
       prompt: settings.prompt,
+      market: settings.market,
       // First run about a minute after switching on; otherwise keep the current slot.
       nextRunAt:
         settings.enabled && !wasOn

@@ -39,8 +39,12 @@
     "sound:reel": "python3 scripts/reel.py",
     "render:reel": "remotion render FuciReel out/fuci-reel.mp4 && remotion render FuciReelVertical out/fuci-reel-vertical.mp4",
     "capture:risk": "node scripts/capture-risk.mjs",
+    "sound:terminal": "python3 scripts/terminal.py",
+    "render:terminal": "remotion render FuciTerminal out/fuci-terminal.mp4",
     "sound:gecko": "python3 scripts/gecko.py",
     "render:gecko": "remotion render FuciGecko out/fuci-gecko.mp4 && remotion render FuciGeckoVertical out/fuci-gecko-vertical.mp4",
+    "sound:kya": "python3 scripts/kya.py",
+    "render:kya": "remotion render FuciKya out/fuci-kya.mp4",
     "sound:tutorial": "python3 scripts/tutorial.py",
     "render:tutorial": "remotion render FuciTutorial out/fuci-tutorial.mp4 && remotion render FuciTutorialVertical out/fuci-tutorial-vertical.mp4"
   },

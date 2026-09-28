@@ -2,6 +2,7 @@ import type { BatchEvmSigner } from "@circle-fin/x402-batching";
 import { planCost, runAgent } from "./agent";
 import {
   GAS_RESERVE,
+  GATEWAY_TOPUP,
   agentAccount,
   agentGatewayFor,
   balancesOf,
@@ -19,6 +20,9 @@ import {
   withAgentLock,
   type AgentCard,
 } from "./store";
+
+/** Most a scheduled run may spend on other sellers in Fuci Market (only when its owner opted in). */
+const MARKET_PER_RUN = 0.02;
 
 /**
  * Automatic runs. Each due agent pays from its own wallet (Circle Gateway, x402),
@@ -98,6 +102,8 @@ async function runOne(agent: AgentCard, origin: string): Promise<string> {
 
   const cost = planCost(auto.strategy);
   const left = agent.dailyLimitUsdc - (await spentToday(agent.id));
+  // With the owner's opt-in, a run may also spend up to MARKET_PER_RUN on other Market sellers, inside the daily limit.
+  const market = auto.market ? Math.max(0, Math.min(MARKET_PER_RUN, left - cost)) : 0;
   if (left < cost - 1e-9) {
     // Not a failure: the owner's daily limit is doing its job.
     auto.nextRunAt = next();
@@ -108,11 +114,11 @@ async function runOne(agent: AgentCard, origin: string): Promise<string> {
 
   // Top up Gateway from the agent's wallet when needed (the deposit costs a little gas).
   const { walletUsdc, gatewayUsdc } = await balancesOf(agent.id);
-  if (gatewayUsdc < cost) {
-    // Only what today's research budget needs, so trading keeps the rest of the wallet.
+  if (gatewayUsdc < cost + market) {
+    // A small float (GATEWAY_TOPUP) within today's budget, so trading keeps the rest of the wallet.
     const topUp =
       Math.floor(
-        Math.min(walletUsdc - GAS_RESERVE, Math.max(left, cost)) * 1e6,
+        Math.min(walletUsdc - GAS_RESERVE, left, Math.max(GATEWAY_TOPUP, cost + market)) * 1e6,
       ) / 1e6;
     if (topUp < cost)
       return finish(
@@ -136,8 +142,9 @@ async function runOne(agent: AgentCard, origin: string): Promise<string> {
     prompt,
     agentId: agent.id,
     strategy: auto.strategy,
-    maxSpendUsdc: Math.min(cost, left),
+    maxSpendUsdc: Math.min(cost + market, left),
     signer,
+    marketUsdc: market,
   });
   await addSpend(agent.id, result.spentUsdc);
 

@@ -1,4 +1,4 @@
-import { type Address } from "viem";
+import { erc20Abi, type Address } from "viem";
 import { ARGUS, HOOK, launchLogs, launchOf, arcClient } from "./argus";
 import { EXPLORER_URL } from "./config";
 import * as market from "./trade";
@@ -24,6 +24,8 @@ import {
   type TradeRule,
 } from "./tradingRules";
 import { recordAgentTrade } from "./forest";
+import { inWindow, judge, signalsOf, trimCreators, type Signals, type Watch } from "./tradeSignals";
+import { addTrade } from "./tradePnl";
 
 /**
  * The trading autopilot. Every tick (about every 5 minutes) it:
@@ -47,6 +49,8 @@ export type Position = {
   /** Take-profit rules that already fired for this position. */
   fired?: string[];
   lastPrice?: number;
+  /** Highest price seen since the buy (for the trailing stop). */
+  peak?: number;
 };
 
 const MAX_TRADES_PER_TICK = 3;
@@ -62,20 +66,42 @@ const savePositions = (agentId: string, p: Record<string, Position>) =>
 // ---------------------------------------------------------------------------
 // One Argus scan per tick, shared by every agent.
 
-type Scan = { lastBlock: number; open: { token: Address; hook: Address }[] };
+type Scan = {
+  lastBlock: number;
+  open: { token: Address; hook: Address }[];
+  /** Smart entry: tokens being watched (new launches and fresh bondings), newest last. */
+  watch?: (Watch & { checkedAt?: number })[];
+  /** Launch timestamps per creator over the last 24 hours (serial-launcher filter). */
+  creators?: Record<string, number[]>;
+};
 const SCAN_KEY = "trade:scan:argus";
 /** Stay this many blocks (~20 s) behind the head, so a launch is past Argus' snipe tax when first seen. */
 const SNIPE_LAG_BLOCKS = 40n;
 /** Most launches looked up per scan. */
 const MAX_LOOKUPS = 60;
 
-export type TickContext = { newLaunches: Address[]; newGraduations: Address[] };
+export type TickContext = {
+  newLaunches: Address[];
+  newGraduations: Address[];
+  /** Smart entry: the watchlist and the signals read this tick (by lowercase token). */
+  watch?: Watch[];
+  signals?: Map<string, Signals>;
+};
+
+/** Blocks on Arc are about half a second apart. */
+const BLOCK_MS = 500;
+/** Watched tokens are kept this long; signals are read for at most this many per tick. */
+const WATCH_MS = 24 * 3_600_000;
+const MAX_WATCH = 400;
+const SIGNALS_PER_TICK = 8;
 
 /** Launches (with their hook) from the live Portals in [from, to]; non-USDC pairs are dropped. */
-async function launchesIn(from: bigint, to: bigint): Promise<Scan["open"]> {
+async function launchesIn(from: bigint, to: bigint, seen?: { logs: Awaited<ReturnType<typeof launchLogs>> }): Promise<(Scan["open"][number] & { creator: Address; block: number })[]> {
   if (to < from) return [];
+  const all = await launchLogs(from, to);
+  if (seen) seen.logs = all;
   // Argus sees thousands of launches a day and each lookup costs ~13 RPC reads: take the newest, a few at a time.
-  const logs = (await launchLogs(from, to)).slice(-MAX_LOOKUPS);
+  const logs = all.slice(-MAX_LOOKUPS);
   const infos: Awaited<ReturnType<typeof launchOf>>[] = [];
   for (let i = 0; i < logs.length; i += 6)
     infos.push(
@@ -92,7 +118,17 @@ async function launchesIn(from: bigint, to: bigint): Promise<Scan["open"]> {
       (i) =>
         i !== null && i.quoteAsset.toLowerCase() === ARGUS.usdc.toLowerCase(),
     )
-    .map((i) => ({ token: i!.token, hook: i!.hook }));
+    .map((i) => ({ token: i!.token, hook: i!.hook, creator: i!.creator, block: logs.find((l) => l.token.toLowerCase() === i!.token.toLowerCase())?.block ?? Number(to) }));
+}
+
+/** The creator's balance of each token, to spot a dev sell later. */
+async function devBalances(items: { token: Address; creator: Address }[]) {
+  if (!items.length) return [];
+  const res = await arcClient.multicall({
+    contracts: items.map((i) => ({ address: i.token, abi: erc20Abi, functionName: "balanceOf" as const, args: [i.creator] })),
+    allowFailure: true,
+  });
+  return res.map((r) => (r.status === "success" ? String(r.result) : undefined));
 }
 
 async function bondedFlags(open: Scan["open"]) {
@@ -115,9 +151,9 @@ async function scanArgus(): Promise<TickContext> {
     const flags = await bondedFlags(open);
     state = {
       lastBlock: Number(head),
-      open: open.filter(
-        (_, i) => flags[i].status === "success" && flags[i].result === false,
-      ),
+      open: open
+        .filter((_, i) => flags[i].status === "success" && flags[i].result === false)
+        .map(({ token, hook }) => ({ token, hook })),
     };
     await kvSet(SCAN_KEY, state);
     return { newLaunches: [], newGraduations: [] };
@@ -126,7 +162,8 @@ async function scanArgus(): Promise<TickContext> {
   // New launches since the last tick (a long gap only looks at the latest windows).
   let from = BigInt(state.lastBlock) + 1n;
   if (head - from > LOG_WINDOW * 4n) from = head - LOG_WINDOW * 4n;
-  const newLaunches = await launchesIn(from, head);
+  const seen = { logs: [] as Awaited<ReturnType<typeof launchLogs>> };
+  const newLaunches = await launchesIn(from, head, seen);
 
   // Bondings among the launches still below their bond tick.
   const open = [...state.open, ...newLaunches].slice(-400);
@@ -134,11 +171,34 @@ async function scanArgus(): Promise<TickContext> {
   const isBonded = (i: number) =>
     flags[i].status === "success" && flags[i].result === true;
   const newGraduations = open.filter((_, i) => isBonded(i)).map((o) => o.token);
+
+  // Smart entry bookkeeping: every creator's launches (all of them, not just the ones looked up),
+  // and the watchlist of new launches and fresh bondings with the creator's balance at first sight.
+  const now = Date.now();
+  const creators = { ...(state.creators ?? {}) };
+  for (const l of seen.logs) {
+    const k = l.creator.toLowerCase();
+    creators[k] = [...(creators[k] ?? []), now - Number(head - BigInt(l.block)) * BLOCK_MS];
+  }
+  const grads = await Promise.all(
+    newGraduations.slice(0, 20).map(async (token) => ({ token, creator: (await launchOf(token).catch(() => null))?.creator })),
+  );
+  const fresh = [
+    ...newLaunches.map((l) => ({ token: l.token, creator: l.creator, kind: "launch" as const, seenAt: now - Number(head - BigInt(l.block)) * BLOCK_MS, seenBlock: l.block })),
+    ...grads.filter((g): g is { token: Address; creator: Address } => Boolean(g.creator)).map((g) => ({ ...g, kind: "bonded" as const, seenAt: now, seenBlock: Number(head) })),
+  ];
+  const devs = await devBalances(fresh).catch(() => fresh.map(() => undefined));
+  const watch = [...(state.watch ?? []), ...fresh.map((w, i) => ({ ...w, devStart: devs[i] }))]
+    .filter((w) => now - w.seenAt < WATCH_MS)
+    .slice(-MAX_WATCH);
+
   await kvSet(SCAN_KEY, {
     lastBlock: Number(head),
-    open: open.filter((_, i) => !isBonded(i)),
+    open: open.filter((_, i) => !isBonded(i)).map(({ token, hook }) => ({ token, hook })),
+    watch,
+    creators: trimCreators(creators, now),
   } satisfies Scan);
-  return { newLaunches: newLaunches.map((l) => l.token), newGraduations };
+  return { newLaunches: newLaunches.map((l) => l.token), newGraduations, watch };
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +230,11 @@ export async function runTradingTick(budgetMs = 35_000) {
     const ids = await tradingAgents();
     if (!ids.length) return { agents: 0 };
     const ctx = await scanArgus();
+    // Smart entry: read signals once per tick for the watched tokens some agent's rule is waiting on.
+    const smart = (await Promise.all(ids.map((id) => getAgent(id).catch(() => null))))
+      .flatMap((a) => (a?.trading?.enabled ? a.trading.rules : []))
+      .filter((r): r is Extract<TradeRule, { kind: "smart-buy" }> => r.kind === "smart-buy");
+    if (smart.length && ctx.watch?.length) ctx.signals = await readSignals(ctx.watch, smart).catch(() => new Map());
     const results: { agent: string; status: string }[] = [];
     for (const id of ids) {
       if (Date.now() - started > budgetMs) break;
@@ -201,6 +266,37 @@ export async function runTradingTick(budgetMs = 35_000) {
   }
 }
 
+/** Signals for the watched tokens inside any smart rule's window, least recently checked first. */
+async function readSignals(watch: Watch[], rules: Extract<TradeRule, { kind: "smart-buy" }>[]) {
+  const state = await kvGet<Scan>(SCAN_KEY);
+  const now = Date.now();
+  const due = (state?.watch ?? (watch as (Watch & { checkedAt?: number })[]))
+    .filter((w) => rules.some((r) => inWindow(w, r, now)))
+    .sort((a, b) => (a.checkedAt ?? 0) - (b.checkedAt ?? 0))
+    .slice(0, SIGNALS_PER_TICK);
+  const out = new Map<string, Signals>();
+  const creators = state?.creators ?? {};
+  // Bounded: the whole read stays inside the tick's time, and one slow token can't hold it up.
+  const deadline = now + 20_000;
+  const within = <T,>(p: Promise<T>, ms: number) => Promise.race([p, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
+  for (let i = 0; i < due.length && Date.now() < deadline; i += 4) {
+    const got = await Promise.all(due.slice(i, i + 4).map((w) => within(signalsOf(w, creators).catch(() => null), 12_000)));
+    got.forEach((sig, k) => sig && out.set(due[i + k].token.toLowerCase(), sig));
+  }
+  if (state?.watch) {
+    const checked = new Set(due.map((w) => w.token.toLowerCase()));
+    await kvSet(SCAN_KEY, { ...state, watch: state.watch.map((w) => (checked.has(w.token.toLowerCase()) ? { ...w, checkedAt: now } : w)) });
+  }
+  return out;
+}
+
+/** Tokens an agent already bought through smart entry, so it never buys the same one twice. */
+const boughtKey = (agentId: string) => `trade:bought:${agentId}`;
+const summaryKey = (agentId: string) => `trade:summary:${agentId}`;
+/** DCA progress per plan (kept outside the owner-signed settings): last buy and USDC spent so far. */
+type DcaState = { lastAt: number; spentUsdc: number };
+const dcaKey = (agentId: string, ruleId: string, token: string) => `trade:dca:${agentId}:${ruleId}:${token.toLowerCase()}`;
+
 /** What the engine needs from the chain; tests swap these for stubs. */
 export type Deps = Pick<
   typeof market,
@@ -219,6 +315,9 @@ export async function runAgentTrading(
   const buys: Action[] = [];
   const notes: string[] = [];
 
+  // Tokens a DCA plan keeps: the automatic exits never sell them (limit sells still can).
+  const kept = new Set(t.rules.filter((r): r is Extract<TradeRule, { kind: "dca" }> => r.kind === "dca" && r.hold).map((r) => r.token.toLowerCase()));
+
   // Open positions: stop loss, take profit, limit sell, dev sold.
   for (const [key, p] of Object.entries(positions)) {
     const m = await marketOf(p.token).catch(() => null);
@@ -234,6 +333,7 @@ export async function runAgentTrading(
     const price = await priceOf(m).catch(() => null);
     if (price === null) continue;
     p.lastPrice = price;
+    p.peak = Math.max(p.peak ?? 0, price);
     const whole = Number(p.amount) / 10 ** p.decimals;
     const entry = whole > 0 ? p.costUsdc / whole : 0;
     const change = entry > 0 ? (price / entry - 1) * 100 : 0;
@@ -247,12 +347,29 @@ export async function runAgentTrading(
 
     let action: Action | null = null;
     for (const r of t.rules) {
+      if (kept.has(key) && r.kind !== "limit-sell") continue;
       if (r.kind === "stop-loss" && entry > 0 && change <= -r.pct)
         action = {
           side: "sell",
           token: p.token,
           pct: 100,
           why: "stop loss",
+          rule: r,
+        };
+      else if (r.kind === "trailing-stop" && entry > 0 && (p.peak ?? 0) > entry && price <= (p.peak ?? 0) * (1 - r.pct / 100))
+        action = {
+          side: "sell",
+          token: p.token,
+          pct: 100,
+          why: `trailing stop, ${r.pct}% off the peak`,
+          rule: r,
+        };
+      else if (r.kind === "time-exit" && entry > 0 && Date.now() - p.openedAt >= r.hours * 3_600_000 && change < r.minGainPct)
+        action = {
+          side: "sell",
+          token: p.token,
+          pct: 100,
+          why: `time exit after ${r.hours}h`,
           rule: r,
         };
       else if (r.kind === "dev-sell" && devSold)
@@ -296,6 +413,8 @@ export async function runAgentTrading(
 
   // Buy rules.
   const holding = new Set(Object.keys(positions));
+  let smartSeen = 0;
+  const skips: Record<string, number> = {};
   for (const r of t.rules) {
     if (r.kind === "snipe-new" || r.kind === "buy-graduated") {
       const tokens =
@@ -320,6 +439,26 @@ export async function runAgentTrading(
         });
       }
     }
+    if (r.kind === "smart-buy" && ctx.watch && ctx.signals) {
+      const already = new Set((await kvGet<string[]>(boughtKey(agent.id)).catch(() => null)) ?? []);
+      for (const w of ctx.watch) {
+        const sig = ctx.signals.get(w.token.toLowerCase());
+        if (!sig || !inWindow(w, r) || already.has(w.token.toLowerCase()) || holding.has(w.token.toLowerCase())) continue;
+        const v = judge(sig, r);
+        smartSeen++;
+        if (!v.ok) {
+          skips[v.reason] = (skips[v.reason] ?? 0) + 1;
+          continue;
+        }
+        buys.push({ side: "buy", token: w.token, usdc: r.usdc, why: v.why, rule: r });
+      }
+    }
+    if (r.kind === "dca") {
+      const st = (await kvGet<DcaState>(dcaKey(agent.id, r.id, r.token)).catch(() => null)) ?? { lastAt: 0, spentUsdc: 0 };
+      const due = Date.now() - st.lastAt >= r.everyHours * 3_600_000 - 60_000;
+      const budgetLeft = r.totalUsdc > 0 ? r.totalUsdc - st.spentUsdc : Infinity;
+      if (due && budgetLeft >= 0.1) buys.push({ side: "buy", token: r.token as Address, usdc: Math.min(r.usdc, budgetLeft), why: `DCA every ${r.everyHours}h`, rule: r });
+    }
     if (r.kind === "limit-buy" && !r.done) {
       const m = await marketOf(r.token as Address).catch(() => null);
       const price = m ? await priceOf(m).catch(() => null) : null;
@@ -335,13 +474,14 @@ export async function runAgentTrading(
   }
 
   let trades = 0;
+  let smartBought = 0;
   let spent = await tradeSpentToday(agent.id);
   const bought = new Set<string>();
   for (const a of [...sells, ...buys]) {
     if (trades >= MAX_TRADES_PER_TICK) break;
     const key = a.token.toLowerCase();
     if (a.side === "buy") {
-      if (bought.has(key) || (a.rule?.kind !== "limit-buy" && holding.has(key)))
+      if (bought.has(key) || (a.rule?.kind !== "limit-buy" && a.rule?.kind !== "dca" && holding.has(key)))
         continue;
       const usdc = Math.min(a.usdc, t.perTradeUsdc);
       if (spent + usdc > t.dailyUsdc + 1e-9) {
@@ -356,6 +496,16 @@ export async function runAgentTrading(
         await addTradeSpend(agent.id, r.usdc);
         positions[key] = await positionAfterBuy(positions[key], r, deps);
         if (a.rule?.kind === "limit-buy") a.rule.done = true;
+        if (a.rule?.kind === "dca") {
+          const k = dcaKey(agent.id, a.rule.id, a.rule.token);
+          const st = (await kvGet<DcaState>(k).catch(() => null)) ?? { lastAt: 0, spentUsdc: 0 };
+          await kvSet(k, { lastAt: Date.now(), spentUsdc: Math.round((st.spentUsdc + r.usdc) * 100) / 100 });
+        }
+        if (a.rule?.kind === "smart-buy") {
+          const prev = (await kvGet<string[]>(boughtKey(agent.id)).catch(() => null)) ?? [];
+          await kvSet(boughtKey(agent.id), [...prev, key].slice(-500)).catch(() => undefined);
+          smartBought++;
+        }
         await logTrade(agent.id, r, a.why);
         t.failures = 0;
       } catch (e) {
@@ -409,8 +559,37 @@ export async function runAgentTrading(
     if (!agent.trading?.enabled) break;
   }
 
+  // One smart-entry summary line: after a buy, or at most every 30 minutes.
+  if (smartSeen > 0) {
+    const last = (await kvGet<number>(summaryKey(agent.id)).catch(() => null)) ?? 0;
+    if (smartBought > 0 || Date.now() - last > 30 * 60_000) {
+      const why = Object.entries(skips)
+        .sort((a, b) => b[1] - a[1])
+        .map(([k, n]) => `${k} ${n}`)
+        .join(", ");
+      await pushHistory(agent.id, {
+        kind: "trade",
+        label: `Smart entry checked ${smartSeen} token${smartSeen === 1 ? "" : "s"}: bought ${smartBought}${why ? ` · skipped: ${why}` : ""}`,
+      });
+      await kvSet(summaryKey(agent.id), Date.now()).catch(() => undefined);
+    }
+  }
+
   await savePositions(agent.id, positions);
   t.lastRunAt = Date.now();
+  {
+    const why = Object.entries(skips)
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, n]) => `${k} ${n}`)
+      .join(", ");
+    const parts = [
+      trades ? `${trades} trade${trades === 1 ? "" : "s"}` : null,
+      smartSeen ? `checked ${smartSeen} token${smartSeen === 1 ? "" : "s"}, bought ${smartBought}${why ? ` (skipped: ${why})` : ""}` : null,
+      Object.keys(positions).length ? `watching ${Object.keys(positions).length} position${Object.keys(positions).length === 1 ? "" : "s"}` : null,
+      notes[0] ?? null,
+    ].filter(Boolean);
+    t.lastResult = parts.length ? parts.join(" · ") : "No new tokens to check yet";
+  }
   // One history note per new problem (an empty wallet, the daily max), not one per tick.
   const note = notes[0];
   if (note && t.pausedReason !== note)
@@ -439,6 +618,7 @@ async function saveMerged(agent: AgentCard) {
   );
   f.failures = t.failures;
   f.lastRunAt = t.lastRunAt;
+  f.lastResult = t.lastResult;
   f.pausedReason = t.pausedReason;
   if (!t.enabled) f.enabled = false;
   await saveAgent(fresh);
@@ -464,6 +644,8 @@ async function failed(agent: AgentCard, why: string) {
 }
 
 async function logTrade(agentId: string, r: TradeResult, why: string) {
+  // Totals for the PnL first (the first call rebuilds them from the history, before this line is in it).
+  await addTrade(agentId, r.side, r.usdc).catch(() => undefined);
   const label =
     r.side === "buy"
       ? `Bought $${r.symbol} for ${r.usdc.toFixed(2)} USDC at ${fmtPrice(r.price)} (${why})`

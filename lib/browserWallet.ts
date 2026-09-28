@@ -311,7 +311,11 @@ export function walletError(e: unknown): string {
   if (code === 4001) return "Request cancelled in your wallet.";
   if (code === -32002)
     return "Your wallet already has a request open. Check the wallet window.";
-  const text = err?.shortMessage ?? err?.details ?? err?.message;
+  if ((e as { name?: string })?.name === "NotAllowedError")
+    return "The passkey prompt was closed or timed out. Try again.";
+  // viem wraps provider errors in a generic "unknown RPC error"; the real reason is in `details`.
+  const generic = /unknown RPC error|internal json-rpc error/i.test(err?.shortMessage ?? "");
+  const text = (generic && err?.details) || (err?.shortMessage ?? err?.details ?? err?.message);
   return typeof text === "string" && text
     ? text.slice(0, 200)
     : typeof e === "string"

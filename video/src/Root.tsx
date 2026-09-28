@@ -25,6 +25,8 @@ import { Deep } from "./scenes/Deep";
 import { Receipt } from "./scenes/Receipt";
 import { Tutorial } from "./scenes/Tutorial";
 import { Gecko } from "./scenes/Gecko";
+import { Terminal } from "./scenes/Terminal";
+import { Kya } from "./scenes/Kya";
 import { Reel } from "./scenes/Reel";
 
 const SCENES: [React.FC, number][] = [
@@ -205,8 +207,27 @@ const FuciGecko: React.FC = () => (
   </AbsoluteFill>
 );
 
+/** 15 s: "Know Your Agent": a checkpoint scans agents, grades them A–F, pays the trusted one. Its own track (scripts/kya.py). */
+const FuciKya: React.FC = () => (
+  <AbsoluteFill style={{ background: "#000" }}>
+    <Html5Audio src={staticFile("kya.wav")} />
+    <Kya />
+  </AbsoluteFill>
+);
+
+/** 15 s: "Agents paying right now": a terminal tails real x402 payments. Its own track (scripts/terminal.py). */
+const FuciTerminal: React.FC = () => (
+  <AbsoluteFill style={{ background: "#000" }}>
+    <Html5Audio src={staticFile("terminal.wav")} />
+    <Terminal />
+  </AbsoluteFill>
+);
+
 export const Root: React.FC = () => (
   <>
+    <Composition id="FuciKya" component={FuciKya} durationInFrames={450} fps={30} width={1920} height={1080} />
+    <Composition id="FuciTerminal" component={FuciTerminal} durationInFrames={450} fps={30} width={1920} height={1080} />
+    <Composition id="FuciTerminalVertical" component={FuciTerminal} durationInFrames={450} fps={30} width={1080} height={1920} />
     <Composition id="FuciGecko" component={FuciGecko} durationInFrames={450} fps={30} width={1920} height={1080} />
     <Composition id="FuciGeckoVertical" component={FuciGecko} durationInFrames={450} fps={30} width={1080} height={1920} />
     <Composition id="FuciTutorial" component={FuciTutorial} durationInFrames={1440} fps={30} width={1920} height={1080} />

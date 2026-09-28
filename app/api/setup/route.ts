@@ -17,7 +17,7 @@ export const maxDuration = 60;
  * Without either configured, only the public checklist is returned.
  */
 
-type Action = "status" | "deposit" | "register-identity" | "fund-validator" | "scheduler" | "set-factory" | "register" | "diagnose" | "ciphertext" | "faucet";
+type Action = "status" | "deposit" | "register-identity" | "fund-validator" | "scheduler" | "set-factory" | "set-escrow" | "register" | "diagnose" | "ciphertext" | "faucet";
 type Body = {
   txHash?: string;
   action?: Action;
@@ -162,6 +162,28 @@ export async function POST(req: NextRequest) {
         await saveFactoryAddress(address);
         return NextResponse.json({ ok: true, factory: await factoryInfo(), tx: explorerTx(receipt.transactionHash) });
       }
+      case "set-escrow": {
+        // The owner deployed FuciEscrow from /setup; check it on-chain before the site uses it.
+        if (!body.txHash || !/^0x[0-9a-fA-F]{64}$/.test(body.txHash)) return NextResponse.json({ error: "txHash is required" }, { status: 400 });
+        const { readClient } = await import("@/lib/chain");
+        const { ESCROW_ABI, ESCROW_BYTECODE } = await import("@/lib/escrowArtifact");
+        const { saveEscrowAddress, escrowInfo } = await import("@/lib/escrow");
+        const c = readClient(ARC_CHAIN);
+        const receipt = await c.waitForTransactionReceipt({ hash: body.txHash as `0x${string}`, timeout: 45_000 });
+        const address = receipt.contractAddress;
+        if (!address || receipt.status !== "success") return NextResponse.json({ error: "That transaction did not deploy a contract" }, { status: 400 });
+        // Same code as this site's build: the constructor args are appended to the creation code, so compare the prefix.
+        const tx = await c.getTransaction({ hash: body.txHash as `0x${string}` });
+        if (!tx.input.toLowerCase().startsWith(ESCROW_BYTECODE.toLowerCase())) return NextResponse.json({ error: "That contract is not this site's FuciEscrow build" }, { status: 400 });
+        const [owner, usdc] = await Promise.all([
+          c.readContract({ address, abi: ESCROW_ABI, functionName: "owner" }) as Promise<string>,
+          c.readContract({ address, abi: ESCROW_ABI, functionName: "usdc" }) as Promise<string>,
+        ]);
+        if (owner.toLowerCase() !== (OWNER_ADDRESS ?? "").toLowerCase()) return NextResponse.json({ error: "The escrow's owner must be your FUCI_SELLER_ADDRESS wallet" }, { status: 400 });
+        if (usdc.toLowerCase() !== ARC_USDC.toLowerCase()) return NextResponse.json({ error: "The escrow points at the wrong USDC" }, { status: 400 });
+        await saveEscrowAddress(address);
+        return NextResponse.json({ ok: true, escrow: await escrowInfo(), tx: explorerTx(receipt.transactionHash) });
+      }
       // Circle Wallets mode (optional): these need the Circle API key.
       case "register":
       case "diagnose":
@@ -212,6 +234,8 @@ export async function POST(req: NextRequest) {
         validator: validator ? { address: validator, explorer: explorerAddress(validator), gasUsdc: validatorGas } : null,
       },
       factory: await (await import("@/lib/factory")).factoryInfo().catch(() => null),
+      escrow: await (await import("@/lib/escrow")).escrowInfo().catch(() => null),
+      treasury: (await import("@/lib/config")).FUCI_TREASURY,
       trading: await (async () => ({ feesUsdc: await (await import("@/lib/store")).tradeFeesTotal(), treasury: await (await import("@/lib/trade")).tradeTreasury() }))().catch(() => null),
       automation: await (async () => {
         const { tickSecret } = await import("@/lib/agentWallets");

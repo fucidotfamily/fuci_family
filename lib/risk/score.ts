@@ -21,7 +21,7 @@ export type Factor = {
 export type Grade = "A" | "B" | "C" | "D" | "F";
 
 export type RiskReport = {
-  kind: "token" | "protocol";
+  kind: "token" | "protocol" | "agent";
   id: string;
   name: string;
   symbol?: string;

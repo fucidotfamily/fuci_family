@@ -19,7 +19,9 @@ export type PositionView = {
   bonded: boolean;
 };
 
-type TradingState = { trading: Trading | null; positions: PositionView[]; spentToday: number; available: boolean };
+export type Activity = { at: number; label: string; href?: string };
+type TradingState = { trading: Trading | null; positions: PositionView[]; spentToday: number; available: boolean; activity?: Activity[]; pnl?: Pnl };
+export type Pnl = { pnlUsdc: number; pnlPct: number | null; boughtUsdc: number; soldUsdc: number; openValueUsdc: number; buys: number; sells: number; since: number | null };
 type WalletState = { address: string; explorer: string; walletUsdc: number | null; gatewayUsdc: number | null } | null;
 
 export const DEFAULT_TRADING: TradingSettings = { enabled: false, perTradeUsdc: 2, dailyUsdc: 10, slippagePct: 10, rules: [] };
@@ -49,7 +51,13 @@ export function useTrading(agent: Owner, mine: boolean) {
   );
 
   useEffect(() => {
-    if (mine) load();
+    if (!mine) return;
+    load();
+    // Keep the autopilot status fresh while the page is open (it checks every 5 minutes).
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, 60_000);
+    return () => clearInterval(t);
   }, [mine, load]);
 
   const settings = (): TradingSettings => {

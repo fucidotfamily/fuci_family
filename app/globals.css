@@ -180,6 +180,14 @@ body {
 .btn-primary:hover {
   background: var(--btn-hover);
 }
+/* The one call to action in the header. */
+.btn-cta {
+  background: var(--up);
+  color: #04110a;
+}
+.btn-cta:hover {
+  filter: brightness(1.08);
+}
 .btn-ghost {
   border: 1px solid var(--line);
   color: var(--ink-2);

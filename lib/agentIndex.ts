@@ -195,7 +195,7 @@ const hostOf = (uri: string) => {
   }
 };
 
-type Card = {
+export type Card = {
   name: string | null;
   description: string | null;
   /** Safe image URL (https or small inline data URI); older cached cards stored a boolean. */
@@ -222,6 +222,9 @@ const cardKey = (uri: string) => `card2:${crypto.createHash("sha256").update(uri
 
 /** Drop a cached registration file (e.g. after its agent was linked to an ERC-8004 id). */
 export const forgetCard = (uri: string) => kvSet(cardKey(uri), null, 1).catch(() => undefined);
+
+/** One agent's registration file (cached like the index's reads), or null when it can't be read. */
+export const agentCardOf = (uri: string) => fetchCard(uri, 5_000);
 
 /** Successful reads are cached in Redis for an hour; failures are retried on the next build. */
 async function fetchCard(uri: string, timeoutMs: number): Promise<Card | null> {

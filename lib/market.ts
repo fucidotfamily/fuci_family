@@ -131,7 +131,7 @@ function privateIp(ip: string) {
 }
 
 /** Refuse hosts whose DNS points into a private network (defence against DNS tricks on seller URLs). */
-async function assertPublicHost(url: URL) {
+export async function assertPublicHost(url: URL) {
   const { lookup } = await import("node:dns/promises");
   const addrs = await lookup(url.hostname, { all: true, verbatim: true });
   if (!addrs.length || addrs.some((a) => privateIp(a.address)))
