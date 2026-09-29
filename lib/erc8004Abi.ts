@@ -29,6 +29,8 @@ export const IDENTITY_ABI = parseAbi([
   "function ownerOf(uint256 tokenId) view returns (address)",
   "function tokenURI(uint256 tokenId) view returns (string)",
   "function getAgentWallet(uint256 agentId) view returns (address)",
+  "function setAgentURI(uint256 agentId, string newURI)",
+  "function setAgentWallet(uint256 agentId, address newWallet, uint256 deadline, bytes signature)",
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
 ]);
 

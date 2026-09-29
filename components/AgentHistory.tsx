@@ -9,7 +9,7 @@ export function AgentHistory({ events, agentId }: { events: HistoryEvent[]; agen
   const paid = events.filter((e) => e.kind === "payment" && e.usdc && !/^Moved /.test(e.label));
   const total = paid.reduce((s, e) => s + (e.usdc ?? 0), 0);
   return (
-    <section className="card mt-6 p-6 sm:p-8">
+    <section className="card p-6 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="eyebrow">History</p>
         <a href={`/api/agent/${agentId}/receipts`} className="btn btn-ghost !py-1.5 text-xs" download>

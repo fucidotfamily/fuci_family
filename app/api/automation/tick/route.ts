@@ -28,16 +28,27 @@ async function tick(req: NextRequest) {
     if ((await storedIndex()).stale) await rebuildIndex().catch(() => undefined);
     const { refreshForest } = await import("@/lib/forest");
     await refreshForest().catch(() => undefined);
+    // Graduated Argus tokens (lib/argusRegistry.ts): new graduations, and the history backfill until done.
+    const { advanceRegistry } = await import("@/lib/argusRegistry");
+    await advanceRegistry(20_000).catch(() => undefined);
+    // Keep the token safety screen warm so "which token?" answers don't wait for it.
+    const { tokenPicks } = await import("@/lib/picks");
+    const { kvGet } = await import("@/lib/store");
+    const cur = await kvGet<{ at: number }>("picks:v1").catch(() => null);
+    if (!cur || Date.now() - cur.at > 10 * 60_000) await tokenPicks(true).catch(() => undefined);
   });
-  // Trading first (prices move), then the research runs with the time that is left.
+  // Trading first (prices move), then escrow jobs, then the research runs with the time that is left.
   const started = Date.now();
   const { runTradingTick } = await import("@/lib/trading");
   const trading = await runTradingTick(30_000).catch((e: Error) => ({ error: e.message.slice(0, 200) }));
   // Vercel Cron calls the *.vercel.app URL, which sits behind Vercel's login wall: the paid tools
   // would answer with that HTML page. In production, agents always call the public domain.
   const origin = process.env.VERCEL_ENV === "production" ? SITE_URL : req.nextUrl.origin;
+  // Escrow jobs for Fuci agents next: paid work with deadlines (see lib/escrowWorker.ts).
+  const { runEscrowTick } = await import("@/lib/escrowWorker");
+  const escrow = await runEscrowTick(origin, Math.max(5_000, 45_000 - (Date.now() - started))).catch((e: Error) => ({ error: e.message.slice(0, 200) }));
   const research = await runDue(origin, Math.max(5_000, 50_000 - (Date.now() - started)));
-  return NextResponse.json({ ...research, trading }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ...research, trading, escrow }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export const GET = tick;

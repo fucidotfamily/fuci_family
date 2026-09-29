@@ -29,6 +29,14 @@
   --frond-a: #3a3a3a;
   --frond-b: #5a5a5a;
   --bubble: rgba(255, 255, 255, 0.45);
+  /* Studio look (matches the product videos): glass cards on a soft green-lit backdrop. */
+  --studio-glow: rgba(22, 60, 40, 0.55);
+  --studio-glow-2: rgba(34, 197, 94, 0.07);
+  --studio-grid: rgba(255, 255, 255, 0.025);
+  --card-top: rgba(22, 24, 26, 0.92);
+  --card-bottom: rgba(12, 13, 14, 0.92);
+  --card-line: rgba(255, 255, 255, 0.08);
+  --card-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   color-scheme: dark;
 }
 
@@ -59,6 +67,13 @@
   --frond-a: #c4c4c4;
   --frond-b: #a3a3a3;
   --bubble: rgba(0, 0, 0, 0.3);
+  --studio-glow: rgba(34, 197, 94, 0.10);
+  --studio-glow-2: rgba(34, 197, 94, 0.06);
+  --studio-grid: rgba(0, 0, 0, 0.035);
+  --card-top: rgba(255, 255, 255, 0.96);
+  --card-bottom: rgba(250, 250, 250, 0.96);
+  --card-line: rgba(0, 0, 0, 0.08);
+  --card-shadow: 0 18px 44px rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   color-scheme: light;
   }
 }
@@ -89,6 +104,13 @@
   --frond-a: #c4c4c4;
   --frond-b: #a3a3a3;
   --bubble: rgba(0, 0, 0, 0.3);
+  --studio-glow: rgba(34, 197, 94, 0.10);
+  --studio-glow-2: rgba(34, 197, 94, 0.06);
+  --studio-grid: rgba(0, 0, 0, 0.035);
+  --card-top: rgba(255, 255, 255, 0.96);
+  --card-bottom: rgba(250, 250, 250, 0.96);
+  --card-line: rgba(0, 0, 0, 0.08);
+  --card-shadow: 0 18px 44px rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   color-scheme: light;
 }
 
@@ -113,9 +135,16 @@
   --font-mono: var(--font-mono-jb), ui-monospace, SFMono-Regular, monospace;
 }
 
+/* Studio backdrop on the canvas; the grid (body::before) sits above it, content above both. */
+html {
+  background:
+    radial-gradient(1400px 900px at 75% -10%, var(--studio-glow), transparent 60%),
+    radial-gradient(900px 700px at 10% 110%, var(--studio-glow-2), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+}
 html,
 body {
-  background: var(--bg);
   color: var(--ink);
   overflow-x: clip;
 }
@@ -124,15 +153,26 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
+/* A faint grid, fading out toward the edges. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: linear-gradient(var(--studio-grid) 1px, transparent 1px), linear-gradient(90deg, var(--studio-grid) 1px, transparent 1px);
+  background-size: 96px 96px;
+  mask-image: radial-gradient(1100px 700px at 50% 30%, black, transparent 80%);
+}
 
 ::selection {
   background: var(--glow);
   color: var(--bg);
 }
 
-/* Flat page background (flat). */
+/* Pages sit on the body's studio backdrop. */
 .depth {
-  background: var(--bg);
+  background: transparent;
 }
 
 /* Concentric rings, very faint. */
@@ -141,9 +181,19 @@ body {
 }
 
 .card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  background: linear-gradient(180deg, var(--card-top), var(--card-bottom));
+  border: 1px solid var(--card-line);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow);
+}
+/* The agent page's menu panel: a card on desktop, plain on phones. */
+@media (min-width: 64rem) {
+  .panel-lg {
+    background: linear-gradient(180deg, var(--card-top), var(--card-bottom));
+    border: 1px solid var(--card-line);
+    border-radius: 16px;
+    box-shadow: var(--card-shadow);
+  }
 }
 
 .glow-text {
@@ -155,14 +205,14 @@ body {
   font-size: 0.72rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--up);
 }
 
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 0.7rem 1.1rem;
   font-weight: 700;
   font-size: 0.8rem;
@@ -207,7 +257,7 @@ body {
   align-items: center;
   gap: 0.45rem;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 8px;
   padding: 0.55rem 0.9rem;
   font-size: 0.72rem;
   font-weight: 600;
@@ -227,7 +277,7 @@ body {
 .field {
   background: var(--field);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 10px;
   color: var(--ink);
   outline: none;
 }
@@ -235,7 +285,8 @@ body {
   color: var(--muted);
 }
 .field:focus {
-  border-color: var(--ink);
+  border-color: var(--up);
+  box-shadow: 0 0 0 3px var(--studio-glow-2);
 }
 
 code,

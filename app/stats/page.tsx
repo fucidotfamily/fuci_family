@@ -104,15 +104,18 @@ export default async function StatsPage() {
             rows={[
               { label: "USDC settled", value: s.payments.usdcSettled === null ? "—" : usd(s.payments.usdcSettled, 4) },
               { label: "Autopilot trades", value: num(s.trading.trades) },
+              ...(s.escrow ? [{ label: "Escrow TVL", value: usd(s.escrow.lockedUsdc), hint: `USDC locked · ${num(s.escrow.jobs)} job${s.escrow.jobs === 1 ? "" : "s"}` }] : []),
               { label: "Launches scanned", value: num(s.payments.launchesScanned) },
             ]}
           />
           <Group
             title="Revenue"
-            lead={{ label: "Total fees", value: usd(s.revenue.totalUsdc), hint: "1 USDC per agent + 1% per trade" }}
+            lead={{ label: "Total fees", value: usd(s.revenue.totalUsdc), hint: "1 USDC per agent, 1% per trade, 10% of Earn yield, 1% of escrow payouts" }}
             rows={[
               { label: "Creation fees", value: usd(s.revenue.creationFeesUsdc) },
               { label: "Trade fees", value: usd(s.revenue.tradeFeesUsdc) },
+              { label: "Earn fees", value: usd(s.revenue.earnFeesUsdc), hint: "10% of yield" },
+              { label: "Escrow fees", value: usd(s.revenue.escrowFeesUsdc), hint: "1% of paid-out jobs" },
               { label: "Treasury", value: s.revenue.treasuryUsdc === null ? "—" : usd(s.revenue.treasuryUsdc), hint: <>Safe · {addr(s.revenue.treasury)}</> },
             ]}
             foot={

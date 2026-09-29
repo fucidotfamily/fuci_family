@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { TOOLS, priceToNumber, type FuciTool } from "@/lib/tools";
-import { X402_NETWORKS } from "@/lib/config";
+import { RESPONSES } from "@/lib/toolSchemas";
+import { CONTACT_EMAIL as PROJECT_EMAIL, X402_NETWORKS } from "@/lib/config";
 
-/** Public contact for agents and marketplaces (optional; set FUCI_CONTACT_EMAIL). */
-const CONTACT_EMAIL = process.env.FUCI_CONTACT_EMAIL?.trim();
+/** Public contact for agents and marketplaces (FUCI_CONTACT_EMAIL overrides the project address). */
+const CONTACT_EMAIL = process.env.FUCI_CONTACT_EMAIL?.trim() || PROJECT_EMAIL;
 
 const GUIDANCE =
   "Fuci sells on-chain data about Arc to AI agents, paid per call in USDC over x402 (Circle Gateway, gas-free for the buyer; pay from Arc, Base, Arbitrum, Ethereum, Optimism, Polygon, Avalanche and more). " +
@@ -11,54 +12,6 @@ const GUIDANCE =
   "Use argus_launches for the newest token launches on Argus (Arc's launchpad), argus_bonding for one token's price, bonding progress and recent trades, " +
   "fucus_oracle for a one-sentence market mood, and fuci_risk for an A–F risk grade of any Arc token (0x address) or DeFi protocol (DefiLlama slug) before allocating capital, and fuci_kya (Know Your Agent) for an A–F trust grade of another agent (ERC-8004 id or wallet) before paying, hiring or trusting it. " +
   "fuci_agent answers a free-text question by buying the tools it needs. All data is read live from Arc and public sources; unknown values are reported as unknown, never guessed.";
-
-/** What every tool returns around its data. */
-const sourced = (data: Record<string, unknown>) => ({
-  type: "object",
-  properties: {
-    tool: { type: "string", description: "The tool id that answered." },
-    source: {
-      type: "string",
-      description: "Where the data came from (chain = read live from Arc).",
-    },
-    block: { type: "integer", description: "Arc block the data was read at." },
-    data,
-  },
-});
-
-const RESPONSES: Record<string, Record<string, unknown>> = {
-  argus_launches: sourced({
-    type: "array",
-    description:
-      "Launches, newest first: token, creator, hook, poolId, symbol, buyTaxPct, sellTaxPct, block.",
-    items: { type: "object" },
-  }),
-  argus_bonding: sourced({
-    type: "object",
-    description:
-      "token, symbol, priceUsdc, progress (0..1 toward bonding), bonded, buyTaxPct, sellTaxPct and recent trades.",
-  }),
-  fucus_oracle: sourced({
-    type: "object",
-    description:
-      "reading (one sentence), netFlowUsdc, mood, launches and trades counted.",
-  }),
-  fuci_risk: {
-    type: "object",
-    description:
-      "A risk report: grade (A–F or null), score 0–100, label, confidence, redFlags, limits (rules capping the grade), factors (each with score, summary, details and sources).",
-  },
-  fuci_kya: {
-    type: "object",
-    description:
-      "A Know Your Agent report: grade (A–F or null), score 0–100, label, confidence, redFlags, limits, factors (identity, registration, reputation, validation, activity, funds, payments, each with score, summary, details and sources) and subject (agentId, name, owner, wallet, cardUrl, x402Support, otherAgentIds).",
-  },
-  fuci_agent: {
-    type: "object",
-    description:
-      "The agent's brief: answer text, the tools it bought, USDC spent and the raw tool data.",
-  },
-};
 
 function operation(t: FuciTool) {
   const fields = Object.entries(t.input ?? {});
@@ -98,12 +51,15 @@ function operation(t: FuciTool) {
             },
           },
         }),
+    // Discovery format read by x402scan and agent clients: an ISO-4217 price (USD, settled in USDC)
+    // and the protocols accepted, one object per protocol.
     "x-payment-info": {
-      price: { mode: "fixed", currency: "USDC", amount },
+      price: { mode: "fixed", currency: "USD", amount },
       protocols: [
         {
           x402: {
             scheme: "exact",
+            asset: "USDC",
             networks: X402_NETWORKS.map((n) => ({
               network: n.network,
               name: n.name,

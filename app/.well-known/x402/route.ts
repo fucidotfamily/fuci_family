@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
     name: "Fuci",
     description:
       "An agentic kelp forest on Arc. Paid data tools for AI agents, settled in USDC over x402 via Circle Gateway.",
+    version: 1, // discovery document version (x402scan spec)
     x402Version: 2,
     network: X402_NETWORK,
     networks: X402_NETWORKS.map((n) => n.network),

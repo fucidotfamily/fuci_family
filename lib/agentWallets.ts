@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { parseUnits, type Address } from "viem";
+import { erc20Abi, parseUnits, type Address } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { GatewayClient } from "@circle-fin/x402-batching/client";
 import { ARC_CHAIN, ARC_RPC_URL, ARC_USDC, GATEWAY_CHAIN } from "./config";
@@ -80,10 +80,13 @@ export const GAS_RESERVE = 0.01;
 export const GATEWAY_TOPUP = 1;
 
 /** Send everything back to the owner: the Gateway balance (instant transfer) and the wallet's USDC minus gas. */
+/** Circle EURC on Arc mainnet. */
+const EURC_ADDRESS = "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1" as const;
+
 export async function withdrawAll(agentId: string, to: Address) {
   const gateway = await agentGatewayFor(agentId);
   const { walletUsdc, gatewayUsdc } = await balancesOf(agentId);
-  const out: { gateway?: string; wallet?: string } = {};
+  const out: { gateway?: string; wallet?: string; eurc?: string } = {};
   if (gatewayUsdc > 0) {
     // Same-chain withdrawal: Gateway mints the USDC straight to the owner on Arc.
     const r = await gateway.withdraw(String(gatewayUsdc), { recipient: to });
@@ -96,6 +99,16 @@ export async function withdrawAll(agentId: string, to: Address) {
     const hash = await walletClientFor(ARC_CHAIN, account).writeContract({ address: ARC_USDC, abi: ERC20_TRANSFER, functionName: "transfer", args: [to, parseUnits(String(send), 6)] });
     await pub.waitForTransactionReceipt({ hash, timeout: 45_000 });
     out.wallet = hash;
+  }
+  // EURC, if the owner sent some for Earn, goes back too.
+  const account = await agentAccount(agentId);
+  const eurc = await readClient(ARC_CHAIN)
+    .readContract({ address: EURC_ADDRESS, abi: erc20Abi, functionName: "balanceOf", args: [account.address] })
+    .catch(() => 0n);
+  if (eurc > 0n) {
+    const hash = await walletClientFor(ARC_CHAIN, account).writeContract({ address: EURC_ADDRESS, abi: erc20Abi, functionName: "transfer", args: [to, eurc] });
+    await readClient(ARC_CHAIN).waitForTransactionReceipt({ hash, timeout: 45_000 });
+    out.eurc = hash;
   }
   return out;
 }

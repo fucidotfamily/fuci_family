@@ -92,6 +92,18 @@ contract EscrowHandler is Test {
         escrow.setPaused(p);
     }
 
+    /// The issuer blocks or unblocks a random actor (Circle's USDC blocklist on Arc).
+    function setBlocked(uint256 who, bool b) external {
+        usdc.setBlacklisted(_actor(who), b);
+    }
+
+    function withdraw(uint256 who) external {
+        address a = _actor(who);
+        if (escrow.owed(a) == 0) return;
+        vm.prank(a);
+        try escrow.withdraw() {} catch {}
+    }
+
     function jobIds() external view returns (uint256[] memory) {
         return ids;
     }
@@ -117,9 +129,17 @@ contract FuciEscrowInvariantTest is Test {
         targetContract(address(handler));
     }
 
+    /// Held payouts add up: totalOwed is the sum of what each address is owed.
+    function invariant_owedAddsUp() public view {
+        address[] memory a = handler.actorList();
+        uint256 sum = escrow.owed(treasury);
+        for (uint256 i = 0; i < a.length; i++) sum += escrow.owed(a[i]);
+        assertEq(escrow.totalOwed(), sum);
+    }
+
     /// The escrow always holds at least what it owes, and exactly what it owes (no one sends it extra here).
     function invariant_solvent() public view {
-        assertEq(usdc.balanceOf(address(escrow)), escrow.totalLocked());
+        assertEq(usdc.balanceOf(address(escrow)), escrow.totalLocked() + escrow.totalOwed());
     }
 
     /// totalLocked is exactly the sum of open jobs.

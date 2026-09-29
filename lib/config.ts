@@ -120,6 +120,8 @@ export const CANONICAL_URL = "https://www.fuci.family";
 export const X_HANDLE = "fucidotfamily";
 export const X_URL = `https://x.com/${X_HANDLE}`;
 export const GITHUB_URL = "https://github.com/fucidotfamily";
+/** The project's public contact address (shown on the site for partners, listings and support). */
+export const CONTACT_EMAIL = "hello@fuci.family";
 
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ||

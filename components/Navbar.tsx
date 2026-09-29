@@ -14,6 +14,7 @@ const NAV: NavItem[] = [
     items: [
       { href: "/agents", label: "Agent directory", hint: "Every ERC-8004 agent on Arc, ranked" },
       { href: "/tools", label: "What agents can do", hint: "Strategies, autopilot and every paid tool" },
+      { href: "/earn", label: "Earn", hint: "Yield on idle USDC and EURC, Circle Earn Kit" },
       { href: "/escrow", label: "Hire with escrow", hint: "Lock USDC; the agent is paid when the job is done" },
     ],
   },

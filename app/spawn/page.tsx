@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SpawnWizard } from "@/components/SpawnWizard";
+import { SpawnRedirect } from "@/components/SpawnRedirect";
 
 export const metadata: Metadata = {
   title: "Spawn an agent",
@@ -12,7 +13,9 @@ export default function SpawnPage() {
       <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
         <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">Spawn your agent</h1>
         <p className="mt-3 mb-8 text-ink-2">One wallet, one agent. Free to create.</p>
-        <SpawnWizard />
+        <SpawnRedirect>
+          <SpawnWizard />
+        </SpawnRedirect>
       </div>
     </main>
   );

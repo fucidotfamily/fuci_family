@@ -9,6 +9,7 @@ import {
   bazaarResourceServerExtension,
   declareDiscoveryExtension,
 } from "@x402/extensions/bazaar";
+import { EXAMPLES, RESPONSES } from "./toolSchemas";
 import { ARC_NETWORK, X402_NETWORKS } from "./config";
 import { sellerAddress } from "./circle";
 import { priceToNumber, type FuciTool } from "./tools";
@@ -85,8 +86,10 @@ function discovery(tool: FuciTool) {
     ),
     required: fields.filter(([, v]) => !v.optional).map(([k]) => k),
   };
+  // Bazaar only publishes the output when it has an example, so both go in.
   const output = {
-    schema: { type: "object", description: `JSON answer of ${tool.name}.` },
+    example: EXAMPLES[tool.id] ?? { tool: tool.id },
+    schema: RESPONSES[tool.id] ?? { type: "object", description: `JSON answer of ${tool.name}.` },
   };
   const input = Object.fromEntries(fields.map(([k, v]) => [k, v.example]));
   return tool.method === "POST"

@@ -9,6 +9,7 @@ const loadAgent = cache(resolveAgent);
 import { CopyButton } from "@/components/CopyButton";
 import { SITE_URL } from "@/lib/config";
 import { Erc8004Panel } from "@/components/Erc8004Panel";
+import { AgentWalletLink } from "@/components/AgentWalletLink";
 import { RegisterIdentity } from "@/components/RegisterIdentity";
 import { ProfileForm } from "@/components/ProfileForm";
 import { OwnerNote } from "@/components/OwnerNote";
@@ -24,6 +25,8 @@ import { defaultDescription, strategyName } from "@/lib/strategy";
 import { createdWithFuci } from "@/lib/forest";
 import { totalsOf } from "@/lib/tradePnl";
 import { OnchainPrompt } from "@/components/OnchainPrompt";
+import { AgentTabs } from "@/components/AgentTabs";
+import { EarnPanel } from "@/components/EarnPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -58,15 +61,49 @@ export default async function AgentPage({ params }: Props) {
   const history = await agentHistory(a);
   const withFuci = await createdWithFuci(a).catch(() => false);
   const onChain = a.erc8004Id !== undefined;
+  const owner = { id: a.id, owner: a.owner, ownerKind: a.ownerKind };
   const traded = ((await totalsOf(a.id).catch(() => null))?.buys ?? 0) > 0;
 
   return (
     <main className="depth min-h-dvh">
-      <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
         <Link href="/#forest" className="text-sm text-muted hover:text-ink">
           ← Back to the forest
         </Link>
-        <div className="card mt-6 overflow-hidden">
+        <AgentTabs
+          owner={a.owner}
+          header={
+            <div className="flex items-center gap-3 px-1">
+              {/* eslint-disable-next-line @next/next/no-img-element -- our own generated avatar route */}
+              <img src={`/api/agent/${a.id}/image?v=${a.image ?? a.x?.connectedAt ?? 0}`} alt="" width={40} height={40} className="h-10 w-10 rounded-full border border-line" />
+              <div className="min-w-0">
+                <p className="truncate font-semibold">{a.name}</p>
+                <p className="truncate text-xs text-muted">{strategyName(a)}</p>
+              </div>
+            </div>
+          }
+          footer={
+            <div className="rounded-lg border border-line p-3 text-xs text-ink-2">
+              <p className="flex items-center gap-2 font-medium text-ink">
+                <span className="live-dot" /> Live · Arc mainnet
+              </p>
+              <p className="mt-1.5">Every number here is read from Arc or from settled payments.</p>
+              {a.wallet && (
+                <a className="mt-2 block truncate font-mono text-[11px] text-muted hover:text-ink" href={`https://explorer.arc.io/address/${a.wallet}`} target="_blank" rel="noreferrer">
+                  wallet · {a.wallet.slice(0, 6)}…{a.wallet.slice(-4)}
+                </a>
+              )}
+            </div>
+          }
+          tabs={[
+            {
+              id: "overview",
+              label: "Overview",
+              sub: "The agent's public card: what it is, what it has done, and where to share it.",
+              icon: "overview",
+              node: (
+                <>
+        <div className="card overflow-hidden">
           <div className="rings p-6 sm:p-8">
             <div className="flex flex-wrap items-center gap-3">
               <p className="eyebrow">Fuci agent card</p>
@@ -135,6 +172,11 @@ export default async function AgentPage({ params }: Props) {
             </dl>
             <p className="mt-6 break-all font-mono text-xs text-muted">holdfast: {a.owner}</p>
             <div className="mt-6 flex flex-wrap items-center gap-2">
+              {a.wallet && (
+                <Link className="btn btn-primary !px-3 !py-1.5 text-xs" href={`/escrow?agent=${a.id}`}>
+                  Hire with escrow
+                </Link>
+              )}
               <CopyButton text={url} label="Copy share link" />
               <a
                 className="rounded-md border border-line px-2 py-1 font-mono text-[11px] text-ink-2 hover:border-ink hover:text-ink"
@@ -155,8 +197,7 @@ export default async function AgentPage({ params }: Props) {
             </div>
           </div>
         </div>
-
-
+        {onChain && a.wallet && <AgentWalletLink agent={a.id} owner={a.owner} banner />}
         {!onChain && (
           <OwnerOnly owner={a.owner}>
             <OnchainPrompt agentId={a.id} createdAt={a.createdAt} fee="1 USDC once">
@@ -165,13 +206,21 @@ export default async function AgentPage({ params }: Props) {
           </OwnerOnly>
         )}
 
-        <AgentWork agent={{ id: a.id, owner: a.owner, ownerKind: a.ownerKind }} name={a.name} defaultStrategy={a.strategy} />
-
-        <OwnerOnly owner={a.owner}>
-          <AgentHistory events={history} agentId={a.id} />
-        </OwnerOnly>
-
-        <section className="card mt-6 p-6 sm:p-8">
+                  <AgentWork agent={owner} name={a.name} defaultStrategy={a.strategy} part="invite" />
+                </>
+              ),
+            },
+            { id: "ask", label: "Chat", sub: "Ask about Argus, paste a token to trade it, or tell your agent what to do: Earn, DCA, autopilot, buy, sell.", icon: "ask", ownerOnly: true, node: <AgentWork agent={owner} name={a.name} defaultStrategy={a.strategy} part="ask" /> },
+            { id: "autopilot", label: "Autopilot", sub: "Trades on its own from the agent wallet every 5 minutes, within your limits.", icon: "autopilot", ownerOnly: true, node: <AgentWork agent={owner} name={a.name} defaultStrategy={a.strategy} part="autopilot" /> },
+            { id: "earn", label: "Earn", sub: "Idle USDC or EURC earns yield in a lending vault on Arc until the agent needs it.", icon: "earn", ownerOnly: true, node: <EarnPanel agent={owner} /> },
+            { id: "history", label: "History", sub: "Every payment, trade and deposit, with a link to its transaction.", icon: "history", ownerOnly: true, node: <AgentHistory events={history} agentId={a.id} /> },
+            {
+              id: "identity",
+              label: "On-chain identity",
+              sub: "Its ERC-8004 record on Arc: profile, reputation and validations anyone can check.",
+              icon: "identity",
+              node: (
+        <section className="card p-6 sm:p-8">
           <p className="eyebrow">On-chain identity · ERC-8004 on Arc</p>
           <div className="mt-4">
             <ProfileForm
@@ -183,7 +232,10 @@ export default async function AgentPage({ params }: Props) {
             {!onChain ? (
               <p className="mt-4 text-sm text-ink-2">Not on-chain yet. The owner can create its identity from the top of this page.</p>
             ) : (
-              <Erc8004Panel agentId={a.erc8004Id} tag2={a.strategy} />
+              <>
+                <Erc8004Panel agentId={a.erc8004Id} tag2={a.strategy} />
+                {a.wallet && <AgentWalletLink agent={a.id} owner={a.owner} />}
+              </>
             )}
           </div>
           <p className="mt-4 text-xs text-muted">
@@ -193,6 +245,10 @@ export default async function AgentPage({ params }: Props) {
             </a>
           </p>
         </section>
+              ),
+            },
+          ]}
+        />
       </div>
     </main>
   );

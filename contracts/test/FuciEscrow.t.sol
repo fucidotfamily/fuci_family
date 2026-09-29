@@ -46,6 +46,8 @@ contract FuciEscrowTest is Test {
     function test_constructor_rejectsBadArgs() public {
         vm.expectRevert(FuciEscrow.ZeroAddress.selector);
         new FuciEscrow(address(0), treasury, FEE, 1_000e6, 10_000e6);
+        vm.expectRevert(FuciEscrow.NotAContract.selector);
+        new FuciEscrow(makeAddr("eoa"), treasury, FEE, 1_000e6, 10_000e6);
         vm.expectRevert(FuciEscrow.ZeroAddress.selector);
         new FuciEscrow(address(usdc), address(0), FEE, 1_000e6, 10_000e6);
         vm.expectRevert(FuciEscrow.FeeTooHigh.selector);
@@ -498,7 +500,7 @@ contract FuciEscrowTest is Test {
 
     // ------------------------------------------------------------------ hostile tokens and blacklists
 
-    function test_reentrancyDuringPayoutReverts() public {
+    function test_reentrancyDuringPayoutIsBlocked() public {
         ReentrantToken rt = new ReentrantToken();
         FuciEscrow e = new FuciEscrow(address(rt), treasury, FEE, 1_000e6, 10_000e6);
         rt.mint(client, 1_000e6);
@@ -509,22 +511,32 @@ contract FuciEscrowTest is Test {
         vm.stopPrank();
         rt.arm(IEscrowLike(address(e)), b);
         vm.prank(client);
-        vm.expectRevert(FuciEscrow.TransferFailed.selector); // the nested release hit the guard
-        e.release(a);
-        assertEq(e.totalLocked(), 2 * AMOUNT);
-        assertEq(rt.balanceOf(address(e)), 2 * AMOUNT);
+        e.release(a); // the nested release hit the guard, so that transfer failed and was held instead
+        assertEq(uint8(e.getJob(a).status), uint8(FuciEscrow.Status.Released));
+        assertEq(uint8(e.getJob(b).status), uint8(FuciEscrow.Status.Funded)); // job b was not touched
+        assertEq(e.totalLocked(), AMOUNT);
+        assertEq(rt.balanceOf(address(e)), e.totalLocked() + e.totalOwed());
     }
 
     function test_blacklistedProviderCanStillBeRefunded() public {
         uint256 id = _create(evaluator);
         _submit(id);
         usdc.setBlacklisted(provider, true);
-        vm.prank(client);
-        vm.expectRevert(FuciEscrow.TransferFailed.selector);
-        escrow.release(id);
         vm.prank(evaluator);
         escrow.reject(id); // the money is not stuck
         assertEq(escrow.totalLocked(), 0);
+        assertEq(usdc.balanceOf(client), 10_000e6);
+    }
+
+    function test_releaseToBlockedProviderIsHeldForThem() public {
+        uint256 id = _create(evaluator);
+        _submit(id);
+        usdc.setBlacklisted(provider, true);
+        vm.prank(client);
+        escrow.release(id);
+        assertEq(escrow.totalLocked(), 0);
+        assertEq(escrow.owed(provider), AMOUNT - (AMOUNT * FEE) / 10_000);
+        assertEq(usdc.balanceOf(address(escrow)), escrow.totalOwed());
     }
 
     // ------------------------------------------------------------------ fuzz

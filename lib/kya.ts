@@ -164,17 +164,20 @@ async function buildKya(q: string, isAddress: boolean): Promise<KyaReport> {
   const idLink: Evidence[] = agentId !== null ? [{ label: `ERC-8004 agent #${agentId}`, href: explorerAgent(agentId) }] : [];
 
   // Identity
+  // A Fuci agent's own wallet that its owner hasn't linked on-chain yet (setAgentWallet): say so, grade unchanged.
+  const fuciAgent = agentId === null && isAddress ? await import("./store").then((m) => m.agentByWallet(wallet)).catch(() => null) : null;
+  const pendingLink = fuciAgent?.erc8004Id !== undefined && fuciAgent ? `This is the wallet of Fuci agent "${fuciAgent.name}" (ERC-8004 #${fuciAgent.erc8004Id}), but its owner hasn't linked it on-chain yet, so the registry doesn't show it.` : null;
   if (agentId === null) {
     factors.push({
       key: "identity",
       label: "On-chain identity",
       score: 0,
       weight: 25,
-      summary: "This wallet has no ERC-8004 identity on Arc: nobody has registered it as an agent.",
+      summary: pendingLink ?? "This wallet has no ERC-8004 identity on Arc: nobody has registered it as an agent.",
       details: ["Checked every agent in the ERC-8004 Identity Registry for this address as owner or agent wallet.", `Registry: ${ERC8004.identity}`],
       evidence: [{ label: "Identity Registry", href: `${EXPLORER_URL}/address/${ERC8004.identity}` }],
     });
-    redFlags.push("No ERC-8004 identity: this wallet is not a registered agent");
+    redFlags.push(pendingLink ? `Not linked on-chain yet: Fuci says this is agent #${fuciAgent!.erc8004Id}'s wallet, but the registry doesn't confirm it` : "No ERC-8004 identity: this wallet is not a registered agent");
     caps.push({ grade: "D", reason: "a wallet with no on-chain identity" });
   } else {
     const details = [`Agent #${agentId}, owned by ${owner}.`];

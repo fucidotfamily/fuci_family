@@ -30,8 +30,11 @@ interface IERC20 {
  *   - Deposits are checked by balance difference, so a short transfer can never be counted as a full one.
  *   - Launch caps on the size of one job and on the total held; changing them never touches existing jobs.
  *   - Two-step ownership; the owner is meant to be the treasury Safe multisig.
- *   - Tokens sent here by mistake can be recovered to the treasury, but never USDC that belongs to a job:
- *     only the surplus above totalLocked.
+ *   - Tokens sent here by mistake can be recovered to the treasury, but never USDC that belongs to a job
+ *     or is held for someone: only the surplus above totalLocked + totalOwed.
+ *   - A job always settles, even if USDC refuses the payout (a recipient blocked by the issuer, or USDC paused).
+ *     The amount is then held for that same address and paid by withdraw() once USDC allows it. It can never
+ *     be redirected, so an issuer freeze stays a freeze, and a pause can't stop a timely reject or refund.
  */
 contract FuciEscrow {
     IERC20 public immutable usdc;
@@ -68,6 +71,9 @@ contract FuciEscrow {
     uint32 public constant MAX_REVIEW = 30 days;
     uint64 public constant MAX_DURATION = 180 days;
     uint256 public constant MAX_URI = 512;
+    /// @notice Gas given to each payout transfer (Arc's USDC transfer uses about 30-55k). A caller who sends too
+    /// little gas can't push a payout into "held" on purpose: the whole call reverts instead.
+    uint256 public constant SEND_GAS = 200_000;
 
     address public owner;
     address public pendingOwner;
@@ -80,6 +86,9 @@ contract FuciEscrow {
 
     /// @notice USDC currently held for open jobs.
     uint256 public totalLocked;
+    /// @notice Settled payouts USDC refused to deliver, held per recipient until withdraw().
+    mapping(address => uint256) public owed;
+    uint256 public totalOwed;
     uint256 public jobCount;
     mapping(uint256 => Job) private _jobs;
 
@@ -108,6 +117,8 @@ contract FuciEscrow {
     event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event Recovered(address indexed token, uint256 amount, address to);
+    event PaymentHeld(uint256 indexed jobId, address indexed to, uint256 amount);
+    event Withdrawn(address indexed to, uint256 amount);
 
     error NotOwner();
     error NotPendingOwner();
@@ -132,6 +143,9 @@ contract FuciEscrow {
     error TransferFailed();
     error ShortDeposit();
     error ExceedsSurplus();
+    error NothingOwed();
+    error LowGas();
+    error NotAContract();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -147,6 +161,7 @@ contract FuciEscrow {
 
     constructor(address usdc_, address treasury_, uint16 feeBps_, uint256 maxJobAmount_, uint256 maxTotalLocked_) {
         if (usdc_ == address(0) || treasury_ == address(0)) revert ZeroAddress();
+        if (usdc_.code.length == 0) revert NotAContract();
         if (treasury_ == address(this)) revert BadTreasury();
         if (feeBps_ > MAX_FEE_BPS) revert FeeTooHigh();
         _checkLimits(maxJobAmount_, maxTotalLocked_);
@@ -284,6 +299,17 @@ contract FuciEscrow {
         _payProvider(jobId, j);
     }
 
+    /// @notice Collect a payout that USDC refused earlier (the recipient was blocked or USDC was paused).
+    /// Always pays the address the job settled to; reverts while USDC still refuses it.
+    function withdraw() external nonReentrant {
+        uint256 amount = owed[msg.sender];
+        if (amount == 0) revert NothingOwed();
+        owed[msg.sender] = 0;
+        totalOwed -= amount;
+        _safeTransfer(address(usdc), msg.sender, amount);
+        emit Withdrawn(msg.sender, amount);
+    }
+
     function getJob(uint256 jobId) external view returns (Job memory) {
         return _jobs[jobId];
     }
@@ -335,7 +361,8 @@ contract FuciEscrow {
     function recoverERC20(address token, uint256 amount) external onlyOwner nonReentrant {
         if (token == address(usdc)) {
             uint256 bal = usdc.balanceOf(address(this));
-            if (bal < totalLocked || amount > bal - totalLocked) revert ExceedsSurplus();
+            uint256 held = totalLocked + totalOwed;
+            if (bal < held || amount > bal - held) revert ExceedsSurplus();
         }
         address to = treasury;
         _safeTransfer(token, to, amount);
@@ -351,9 +378,9 @@ contract FuciEscrow {
         address provider = j.provider;
         j.status = Status.Released;
         totalLocked -= amount;
-        _safeTransfer(address(usdc), provider, amount - fee);
-        if (fee > 0) _safeTransfer(address(usdc), treasury, fee);
         emit Released(jobId, provider, amount - fee, fee, msg.sender);
+        _send(jobId, provider, amount - fee);
+        if (fee > 0) _send(jobId, treasury, fee);
     }
 
     function _refund(uint256 jobId, Job storage j) private {
@@ -361,8 +388,28 @@ contract FuciEscrow {
         address client = j.client;
         j.status = Status.Refunded;
         totalLocked -= amount;
-        _safeTransfer(address(usdc), client, amount);
         emit Refunded(jobId, client, amount, msg.sender);
+        _send(jobId, client, amount);
+    }
+
+    /// @dev Pays a settled amount, or holds it for `to` if USDC refuses (blocked recipient, USDC paused).
+    function _send(uint256 jobId, address to, uint256 amount) private {
+        if (gasleft() < SEND_GAS + SEND_GAS / 63 + 20_000) revert LowGas();
+        bytes memory callData = abi.encodeCall(IERC20.transfer, (to, amount));
+        address token = address(usdc);
+        bool ok;
+        // Reads at most 32 bytes of return data (no return-data bomb); success = the call didn't revert and
+        // returned nothing or `true`.
+        assembly ("memory-safe") {
+            ok := call(SEND_GAS, token, 0, add(callData, 0x20), mload(callData), 0, 0x20)
+            if returndatasize() {
+                ok := and(ok, and(gt(returndatasize(), 0x1f), eq(mload(0), 1)))
+            }
+        }
+        if (ok) return;
+        owed[to] += amount;
+        totalOwed += amount;
+        emit PaymentHeld(jobId, to, amount);
     }
 
     function _checkLimits(uint256 maxJob, uint256 maxTotal) private pure {

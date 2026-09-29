@@ -119,6 +119,26 @@ export async function recentJobs(limit = 20): Promise<EscrowJob[]> {
   return ids.flatMap((id, i) => (res[i].status === "success" ? [toJob(id, res[i].result as unknown as RawJob)] : []));
 }
 
+/** Jobs where `wallet` is the client, the agent or the reviewer, newest first (scans the newest 500). */
+export async function jobsOf(wallet: string, limit = 50): Promise<(EscrowJob & { role: "client" | "agent" | "reviewer" })[]> {
+  const info = await escrowInfo();
+  if (!info || info.jobs === 0) return [];
+  const w = wallet.toLowerCase();
+  const ids = Array.from({ length: Math.min(500, info.jobs) }, (_, i) => info.jobs - i);
+  const res = await client().multicall({
+    allowFailure: true,
+    contracts: ids.map((id) => ({ address: info.address, abi: ESCROW_ABI, functionName: "getJob", args: [BigInt(id)] })),
+  });
+  const out: (EscrowJob & { role: "client" | "agent" | "reviewer" })[] = [];
+  ids.forEach((id, i) => {
+    if (res[i].status !== "success" || out.length >= limit) return;
+    const j = toJob(id, res[i].result as unknown as RawJob);
+    const role = j.client.toLowerCase() === w ? "client" : j.provider.toLowerCase() === w ? "agent" : j.evaluator.toLowerCase() === w ? "reviewer" : null;
+    if (role) out.push({ ...j, role });
+  });
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Job texts (terms and deliverables) are kept off-chain; the chain stores their keccak256.
 

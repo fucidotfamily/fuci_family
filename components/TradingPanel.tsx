@@ -6,7 +6,7 @@ import { BuyUsdc } from "./BuyUsdc";
 import { fmtPrice } from "./TokenCard";
 import type { Activity, Pnl, TradingOps } from "./useTrading";
 import { FUCI_TOKEN, SITE_URL, X_HANDLE } from "@/lib/config";
-import { DEFAULT_MAX_BUY_TAX_PCT, SMART_DEFAULTS, TRADE_FEE_PCT, type SmartFilters, type TradeRule, type TradingSettings } from "@/lib/tradingRules";
+import { DEFAULT_MAX_BUY_TAX_PCT, MAX_TRADE_USDC, SMART_DEFAULTS, TRADE_FEE_PCT, type SmartFilters, type TradeRule, type TradingSettings } from "@/lib/tradingRules";
 
 /** The checklist the owner edits; turned into rules on save. */
 type Form = {
@@ -30,6 +30,10 @@ type Form = {
 };
 
 const DCA_EVERY = [1, 4, 6, 12, 24, 72, 168];
+
+/** USDC the DCA plans buy in a full day (a plan every 3 days counts a third of a buy). */
+const dcaPerDay = (dca: { token: string; usdc: number; everyHours: number }[]) =>
+  dca.filter((d) => d.token.trim()).reduce((sum, d) => sum + (d.usdc || 0) * (24 / Math.max(1, d.everyHours)), 0);
 const MAX_DCA = 5;
 
 function toForm(s: TradingSettings, fresh: boolean): Form {
@@ -299,7 +303,25 @@ export function Autopilot({ ops }: { ops: TradingOps }) {
   const orders = (state.trading?.rules ?? []).filter((r) => (r.kind === "limit-buy" || r.kind === "limit-sell") && !r.done);
   const cancel = (id: string) => ops.save(toSettings(f, savedOrders.filter((o) => o.id !== id)), "orders", "Order cancelled.");
   const nothingPicked = !f.snipe.on && !f.grad.on && !f.smart.on && !f.tp.on && !f.sl.on && !f.dev.on && !f.trail.on && !f.timeExit.on && !f.dca.some((d) => d.token.trim());
-  const setDca = (i: number, patch: Partial<Form["dca"][number]>) => set({ dca: f.dca.map((d, k) => (k === i ? { ...d, ...patch } : d)) });
+  // A DCA plan brings its own limits: per trade at least its amount, per day at least what the plans buy in a day.
+  const setDca = (i: number, patch: Partial<Form["dca"][number]>) => {
+    const dca = f.dca.map((d, k) => (k === i ? { ...d, ...patch } : d));
+    const biggest = Math.max(0, ...dca.map((d) => d.usdc || 0));
+    set({
+      dca,
+      perTradeUsdc: Math.min(MAX_TRADE_USDC, Math.max(f.perTradeUsdc, biggest)),
+      dailyUsdc: Math.min(1000, Math.max(f.dailyUsdc, Math.ceil(dcaPerDay(dca)))),
+    });
+  };
+  const openLimits = () => {
+    const el = document.getElementById("autopilot-limits") as HTMLDetailsElement | null;
+    const strategy = el?.closest("details:not(#autopilot-limits)") as HTMLDetailsElement | null;
+    if (strategy) strategy.open = true;
+    if (el) {
+      el.open = true;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
   const addDca = (token = "") =>
     set({ dca: [...f.dca, { id: `d${Date.now().toString(36).slice(-6)}`, token, usdc: Math.min(1, f.perTradeUsdc), everyHours: 24, totalUsdc: 0, hold: true }] });
   const sm = (patch: Partial<Form["smart"]>) => set({ smart: { ...f.smart, ...patch } });
@@ -381,6 +403,9 @@ export function Autopilot({ ops }: { ops: TradingOps }) {
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-line" role="img" aria-label={`${Math.round((state.spentToday / Math.max(f.dailyUsdc, 0.01)) * 100)}% of the daily limit used`}>
               <div className="h-full rounded-full bg-up" style={{ width: `${Math.min(100, (state.spentToday / Math.max(f.dailyUsdc, 0.01)) * 100)}%` }} />
             </div>
+            <button type="button" className="mt-2 text-xs text-ink-2 underline-offset-2 hover:text-ink hover:underline" onClick={openLimits}>
+              Change daily limit
+            </button>
           </div>
           <div className="rounded-md border border-line p-4">
             <p className="text-xs uppercase tracking-widest text-muted">Positions</p>
@@ -549,7 +574,16 @@ export function Autopilot({ ops }: { ops: TradingOps }) {
             </button>
           </div>
         )}
-        <p className="mt-1.5 text-xs text-muted">Each buy counts toward your per-trade and daily limits. With Keep on, take profit, stop loss, trailing and time exits leave this token alone.</p>
+        {dcaPerDay(f.dca) > 0 && (
+          <p className="mt-2 text-xs text-ink-2">
+            Your DCA buys up to <b className="text-ink">{Number(dcaPerDay(f.dca).toFixed(2))} USDC a day</b>. Limits: {f.perTradeUsdc} USDC per trade, {f.dailyUsdc} USDC per day
+            {dcaPerDay(f.dca) > f.dailyUsdc + 1e-9 ? <span className="text-danger"> (too low: some buys will wait until tomorrow)</span> : null}.{" "}
+            <button type="button" className="underline hover:text-ink" onClick={openLimits}>
+              Change limits
+            </button>
+          </p>
+        )}
+        <p className="mt-1.5 text-xs text-muted">Each buy counts toward your per-trade and daily limits, which rise to fit your DCA when you edit it. With Keep on, take profit, stop loss, trailing and time exits leave this token alone.</p>
 
         <p className="mt-5 text-xs font-semibold uppercase tracking-widest text-muted">When to buy</p>
         <ul className="mt-2 space-y-2">
@@ -642,7 +676,7 @@ export function Autopilot({ ops }: { ops: TradingOps }) {
           </Row>
         </ul>
 
-        <details className="mt-4 text-sm">
+        <details id="autopilot-limits" className="mt-4 scroll-mt-24 text-sm">
           <summary className="cursor-pointer text-ink-2 hover:text-ink">Advanced: limits and slippage</summary>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="flex items-center justify-between gap-2 rounded-md border border-line px-3 py-2">

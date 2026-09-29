@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { TOOLS, toolById } from "@/lib/tools";
 import { requirementsFor } from "@/lib/x402";
 import { sellerAddress } from "@/lib/circle";
+import { MCP_PROMPTS, MCP_RESOURCES } from "@/lib/mcpCatalog";
 
 export const dynamic = "force-dynamic";
 
@@ -42,17 +43,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         ok(msg.id, {
           protocolVersion: (msg.params?.protocolVersion as string) ?? "2025-06-18",
-          capabilities: { tools: {} },
-          serverInfo: { name: "fuci", version: "0.1.0" },
+          capabilities: { tools: { listChanged: false }, prompts: { listChanged: false }, resources: { listChanged: false, subscribe: false } },
+          serverInfo: { name: "fuci", title: "Fuci", version: "1.1.0", websiteUrl: "https://www.fuci.family" },
           instructions: "Fuci tools are paid per call in USDC on Arc via x402. tools/call returns payment requirements and the URL to pay.",
         }),
       );
     case "ping":
       return NextResponse.json(ok(msg.id, {}));
     case "resources/list":
-      return NextResponse.json(ok(msg.id, { resources: [] }));
+      return NextResponse.json(ok(msg.id, { resources: MCP_RESOURCES.map((r) => ({ uri: r.uri, name: r.name, title: r.title, description: r.description, mimeType: r.mimeType })) }));
+    case "resources/templates/list":
+      return NextResponse.json(ok(msg.id, { resourceTemplates: [] }));
+    case "resources/read": {
+      const r = MCP_RESOURCES.find((x) => x.uri === msg.params?.uri);
+      if (!r) return NextResponse.json(fail(msg.id, -32002, "Resource not found"));
+      const text = await fetch(r.url, { cache: "no-store" })
+        .then((res) => (res.ok ? res.text() : Promise.reject(new Error(`HTTP ${res.status}`))))
+        .catch(() => null);
+      if (text === null) return NextResponse.json(fail(msg.id, -32603, `Couldn't read ${r.url}`));
+      return NextResponse.json(ok(msg.id, { contents: [{ uri: r.uri, mimeType: r.mimeType, text }] }));
+    }
     case "prompts/list":
-      return NextResponse.json(ok(msg.id, { prompts: [] }));
+      return NextResponse.json(ok(msg.id, { prompts: MCP_PROMPTS.map((p) => ({ name: p.name, title: p.title, description: p.description, arguments: p.arguments })) }));
+    case "prompts/get": {
+      const p = MCP_PROMPTS.find((x) => x.name === msg.params?.name);
+      if (!p) return NextResponse.json(fail(msg.id, -32602, "Unknown prompt"));
+      const args = Object.fromEntries(Object.entries((msg.params?.arguments as Record<string, unknown>) ?? {}).map(([k, v]) => [k, String(v)]));
+      const missing = p.arguments.find((a) => a.required && !args[a.name]);
+      if (missing) return NextResponse.json(fail(msg.id, -32602, `Missing argument: ${missing.name}`));
+      return NextResponse.json(ok(msg.id, { description: p.description, messages: [{ role: "user", content: { type: "text", text: p.text(args) } }] }));
+    }
     case "tools/list":
       return NextResponse.json(
         ok(msg.id, {

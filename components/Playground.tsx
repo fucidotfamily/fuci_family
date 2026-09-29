@@ -59,6 +59,8 @@ export function Playground({
   placeholder = "Ask about Argus launches, bonding, or the tide…",
   tokenSlot,
   ask,
+  command,
+  suggestions = SUGGESTIONS,
   priceLabel = "free",
 }: {
   agentId?: string;
@@ -69,6 +71,9 @@ export function Playground({
   ask?: (prompt: string, strategy: string) => Promise<PlaygroundResult>;
   /** Shown on the Ask button, e.g. "$0.04" or "free". */
   priceLabel?: string;
+  /** Checked before asking: returns something to show (a command to confirm) instead of asking, or null. */
+  command?: (prompt: string) => Promise<ReactNode | null>;
+  suggestions?: string[];
 }) {
   const [prompt, setPrompt] = useState("");
   const [strategy, setStrategy] = useState(defaultStrategy);
@@ -78,6 +83,7 @@ export function Playground({
   const [validation, setValidation] = useState<Validation | null>(null);
   const [validating, setValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [commandNode, setCommandNode] = useState<ReactNode | null>(null);
   const timers = useRef<number[]>([]);
 
   const run = async (text = prompt) => {
@@ -87,7 +93,16 @@ export function Playground({
     setResult(null);
     setValidation(null);
     setShown([]);
+    setCommandNode(null);
     try {
+      if (command) {
+        const node = await command(text);
+        if (node) {
+          setCommandNode(node);
+          setRunning(false);
+          return;
+        }
+      }
       let r: PlaygroundResult;
       if (ask) r = await ask(text, strategy);
       else {
@@ -154,7 +169,7 @@ export function Playground({
   const used =
     !tokenSlot ||
     running ||
-    shown.length > 0 ||
+    (shown.length > 0 && !commandNode) ||
     result !== null ||
     error !== null;
 
@@ -190,6 +205,7 @@ export function Playground({
           )}
         </form>
         {token && tokenSlot?.(token)}
+        {!token && commandNode}
         {!token && (
           <>
             <div
@@ -211,7 +227,7 @@ export function Playground({
             </div>
             {!shown.length && !running && (
               <div className="mt-4 flex flex-wrap gap-2">
-                {SUGGESTIONS.map((q) => (
+                {suggestions.map((q) => (
                   <button
                     key={q}
                     onClick={() => {

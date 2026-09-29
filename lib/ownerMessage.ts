@@ -1,5 +1,5 @@
 /** Message an agent's owner signs to change its profile (shared by browser and server). */
-export const ownerMessage = (p: { action: "set-image" | "remove-image" | "connect-x" | "disconnect-x" | "set-automation" | "withdraw" | "set-trading" | "sell" | "buy" | "ask" | "set-profile"; agent: string; detail?: string; issuedAt: number }) =>
+export const ownerMessage = (p: { action: "set-image" | "remove-image" | "connect-x" | "disconnect-x" | "set-automation" | "withdraw" | "set-trading" | "sell" | "buy" | "ask" | "set-profile" | "earn-deposit" | "earn-withdraw"; agent: string; detail?: string; issuedAt: number }) =>
   ["Fuci: update my agent", `Action: ${p.action}`, `Agent: ${p.agent}`, ...(p.detail ? [`Detail: ${p.detail}`] : []), `Issued at: ${p.issuedAt}`].join("\n");
 
 export type AutomationSettings = { enabled: boolean; everyMinutes: number; strategy: string; prompt: string; dailyLimitUsdc: number; market?: boolean };

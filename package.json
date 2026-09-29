@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
+    "@circle-fin/adapter-viem-v2": "^1.18.0",
     "@circle-fin/developer-controlled-wallets": "^10.8.1",
+    "@circle-fin/earn-kit": "^1.8.0",
     "@circle-fin/modular-wallets-core": "^1.0.16",
     "@circle-fin/onramp-kit": "^1.0.2",
     "@circle-fin/x402-batching": "^3.5.0",

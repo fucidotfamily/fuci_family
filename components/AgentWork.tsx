@@ -1,15 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { Playground, type PlaygroundResult } from "./Playground";
+import type { PlaygroundResult } from "./Playground";
+import { AgentChat } from "./AgentChat";
 import { TokenCard } from "./TokenCard";
 import { Autopilot } from "./TradingPanel";
 import { ScheduledReports } from "./AutomationPanel";
+import { EarnPanel } from "./EarnPanel";
+import { CommandCard, type Proposal } from "./CommandCard";
 import { post, signed, useIsOwner, type Owner } from "./OwnerTools";
 import { toolById } from "@/lib/tools";
 import { useTrading } from "./useTrading";
 
 const ASK_PRICE = toolById("fuci_agent")!.price;
+const COMMAND_SUGGESTIONS = ["Put all my idle USDC in Earn", "DCA $FUCI 2 USDC every hour", "Which token is closest to bonding?", "Stop the autopilot"];
 const SESSION_MS = 23 * 60 * 60_000; // the server accepts 24 h; renew a little early
 
 type Session = { address: string; issuedAt: number; signature: string };
@@ -33,12 +37,15 @@ async function askSession(agent: Owner): Promise<Session> {
 }
 
 /** "Put <agent> to work": ask it, trade one token, or let the autopilot trade on its own. */
-export function AgentWork({ agent, name, defaultStrategy }: { agent: Owner; name: string; defaultStrategy: string }) {
+export function AgentWork({ agent, name, defaultStrategy, part = "all" }: { agent: Owner; name: string; defaultStrategy: string; part?: "all" | "ask" | "autopilot" | "invite" }) {
   const mine = useIsOwner(agent.owner);
   const ops = useTrading(agent, mine);
 
   // Asking, trading and the autopilot belong to the owner; visitors get an invitation instead.
+  // "invite" is the visitors' call to spawn their own; the owner already has the tabs.
+  if (part === "invite" && mine) return null;
   if (!mine) {
+    if (part === "autopilot") return null;
     return (
       <section className="card mt-6 flex flex-wrap items-center justify-between gap-4 p-6 sm:p-8">
         <div>
@@ -53,51 +60,40 @@ export function AgentWork({ agent, name, defaultStrategy }: { agent: Owner; name
   }
 
   return (
-    <section className="mt-10" aria-labelledby="work-title">
-      <h2 id="work-title" className="font-display text-3xl font-semibold">
-        Put {name} to work
-      </h2>
-      <ul className="mt-3 space-y-1 text-sm text-ink-2">
-        <li>
-          <b className="text-ink">Ask</b> a question about Argus launches on Arc.{" "}
-          {mine ? `Your agent pays ${ASK_PRICE} per answer from its wallet, over x402 (you sign once a day).` : "Free to try: Fuci sponsors a few questions a day."}
-        </li>
-        <li>
-          <b className="text-ink">Paste a token address</b> (0x…) to see its price and {mine ? "buy it, or set a limit buy or limit sell." : "progress to bonding."}
-        </li>
-        {mine && (
-          <li>
-            <b className="text-ink">Autopilot</b> trades on its own from the agent wallet, every 5 minutes.
-          </li>
-        )}
-      </ul>
+    <section className={part === "all" ? "mt-10" : ""} aria-labelledby="work-title">
+      {part !== "autopilot" && (
+        <>
+      <AgentChat
+        name={name}
+        price={ASK_PRICE}
+        suggestions={COMMAND_SUGGESTIONS}
+        tokenCard={(address) => <TokenCard address={address} ops={ops} />}
+        command={async (prompt) => {
+          const r = (await post(`/api/agent/${agent.id}/intent`, { prompt, ...(await askSession(agent)) }).catch(() => ({ kind: "question" }))) as
+            | Proposal
+            | { kind: "question" }
+            | { kind: "unclear"; message: string };
+          if (r.kind === "action") return <CommandCard agent={agent} ops={ops} proposal={r} />;
+          if (r.kind === "unclear") return <p className="rounded-2xl rounded-tl-md border border-line bg-surface-2/60 px-4 py-3 text-sm text-ink">{r.message}</p>;
+          return null;
+        }}
+        ask={async (prompt) => {
+          const r = (await post(`/api/agent/${agent.id}/ask`, { prompt, ...(await askSession(agent)) })) as PlaygroundResult;
+          void ops.load();
+          return r;
+        }}
+      />
+        </>
+      )}
 
-      <div className="mt-5">
-        <Playground
-          agentId={agent.id}
-          defaultStrategy={defaultStrategy === "custom" ? "" : defaultStrategy}
-          placeholder="Ask about Argus, or paste a token address (0x…)"
-          tokenSlot={(address) => <TokenCard address={address} ops={mine ? ops : null} />}
-          priceLabel={mine ? ASK_PRICE : "free"}
-          ask={
-            mine
-              ? async (prompt, strategy) => {
-                  const r = (await post(`/api/agent/${agent.id}/ask`, { prompt, strategy: strategy || undefined, ...(await askSession(agent)) })) as PlaygroundResult;
-                  void ops.load();
-                  return r;
-                }
-              : undefined
-          }
-        />
-      </div>
-
-      {mine && (
-        <div className="card mt-6 space-y-5 p-6 sm:p-8">
+      {mine && part !== "ask" && (
+        <div className={`card space-y-5 p-6 sm:p-8 ${part === "all" ? "mt-6" : ""}`}>
           <p className="eyebrow">Autopilot</p>
           <Autopilot ops={ops} />
           <ScheduledReports agent={agent} defaultStrategy={defaultStrategy === "custom" ? "scout" : defaultStrategy} />
         </div>
       )}
+      {mine && part === "all" && <EarnPanel agent={agent} />}
     </section>
   );
 }

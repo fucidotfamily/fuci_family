@@ -1,6 +1,6 @@
 // DefiLlama TVL adapter for Fuci (to submit as projects/fuci/index.js in DefiLlama/DefiLlama-Adapters).
-// TVL = USDC locked in FuciEscrow for open agent jobs on Arc. Replace ESCROW with the deployed address.
-const ESCROW = "0x0000000000000000000000000000000000000000";
+// TVL = USDC locked in FuciEscrow for open agent jobs on Arc.
+const ESCROW = "0xb30d1c83454260614ccf06ae0f3c1af8b47515b1";
 const USDC = "0x3600000000000000000000000000000000000000";
 
 module.exports = {

@@ -27,6 +27,11 @@ import { Tutorial } from "./scenes/Tutorial";
 import { Gecko } from "./scenes/Gecko";
 import { Terminal } from "./scenes/Terminal";
 import { Kya } from "./scenes/Kya";
+import { Sorter } from "./scenes/Sorter";
+import { Odometer } from "./scenes/Odometer";
+import { EarnChat } from "./scenes/EarnChat";
+import { ArcOS } from "./scenes/ArcOS";
+import { TalkAgent } from "./scenes/TalkAgent";
 import { Reel } from "./scenes/Reel";
 
 const SCENES: [React.FC, number][] = [
@@ -223,8 +228,53 @@ const FuciTerminal: React.FC = () => (
   </AbsoluteFill>
 );
 
+/** 15 s: "Autopilot, upgraded": a sorting machine for smart entry, DCA into a jar, the PnL card. Its own track (scripts/sorter.py). */
+const FuciSorter: React.FC = () => (
+  <AbsoluteFill style={{ background: "#000" }}>
+    <Html5Audio src={staticFile("sorter.wav")} />
+    <Sorter />
+  </AbsoluteFill>
+);
+
+/** 15 s: "Fuci, by the numbers": mechanical odometers roll to live stats. Its own track (scripts/odometer.py). */
+const FuciOdometer: React.FC = () => (
+  <AbsoluteFill style={{ background: "#000" }}>
+    <Html5Audio src={staticFile("odometer.wav")} />
+    <Odometer />
+  </AbsoluteFill>
+);
+
+/** 18 s: "Your agent earns. Just ask." Chat commands + Earn (Circle Earn Kit). Its own track (scripts/earnchat.py). */
+const FuciEarnChat: React.FC = () => (
+  <AbsoluteFill style={{ background: "#000" }}>
+    <Html5Audio src={staticFile("earnchat.wav")} />
+    <EarnChat />
+  </AbsoluteFill>
+);
+
+/** 18 s: "Fuci, built on Arc": transact, contract, coordinate. Its own track (scripts/arcos.py). */
+const FuciArcOS: React.FC = () => (
+  <AbsoluteFill style={{ background: "#02030a" }}>
+    <Html5Audio src={staticFile("arcos.wav")} />
+    <ArcOS />
+  </AbsoluteFill>
+);
+
+/** 15 s: "Just tell your agent": chat commands, pastel sticker style. Its own track (scripts/talk.py). */
+const FuciTalk: React.FC = () => (
+  <AbsoluteFill>
+    <Html5Audio src={staticFile("talk.wav")} />
+    <TalkAgent />
+  </AbsoluteFill>
+);
+
 export const Root: React.FC = () => (
   <>
+    <Composition id="FuciTalk" component={FuciTalk} durationInFrames={450} fps={30} width={1920} height={1080} />
+    <Composition id="FuciArcOS" component={FuciArcOS} durationInFrames={540} fps={30} width={1920} height={1080} />
+    <Composition id="FuciEarnChat" component={FuciEarnChat} durationInFrames={540} fps={30} width={1920} height={1080} />
+    <Composition id="FuciOdometer" component={FuciOdometer} durationInFrames={450} fps={30} width={1920} height={1080} />
+    <Composition id="FuciSorter" component={FuciSorter} durationInFrames={450} fps={30} width={1920} height={1080} />
     <Composition id="FuciKya" component={FuciKya} durationInFrames={450} fps={30} width={1920} height={1080} />
     <Composition id="FuciTerminal" component={FuciTerminal} durationInFrames={450} fps={30} width={1920} height={1080} />
     <Composition id="FuciTerminalVertical" component={FuciTerminal} durationInFrames={450} fps={30} width={1080} height={1920} />

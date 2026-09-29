@@ -233,6 +233,20 @@ export async function getAgent(id: string): Promise<AgentCard | null> {
   return mem.agents.get(id) ?? null;
 }
 
+/** The first agent matching `match` (a scan; fine for the few hundred agents Fuci has). */
+async function findAgent(match: (a: AgentCard) => boolean): Promise<AgentCard | null> {
+  const all = redis
+    ? ((await redis.hvals(K.agents)) as (AgentCard | string)[]).map(parse).filter(isAgent)
+    : [...mem.agents.values()];
+  return all.find(match) ?? null;
+}
+
+/** The agent whose own wallet (AgentCard.wallet) is `address`, or null. */
+export const agentByWallet = (address: string) => findAgent((a) => a.wallet?.toLowerCase() === address.toLowerCase());
+
+/** The agent registered as ERC-8004 #`erc8004Id`, or null. */
+export const agentByErc8004Id = (erc8004Id: number) => findAgent((a) => a.erc8004Id === erc8004Id);
+
 /** The agent owned by `owner` (one wallet, one agent), or null. */
 export async function agentOf(owner: string): Promise<AgentCard | null> {
   const key = owner.toLowerCase();

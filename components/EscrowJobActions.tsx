@@ -28,11 +28,15 @@ export function EscrowJobActions({ job, escrow, now }: { job: EscrowJob; escrow:
   const reviewOver = job.status === "Submitted" && now > job.reviewDeadline;
 
   const actions: Action[] = [];
-  if ((isClient || isEvaluator) && !reviewOver) actions.push({ fn: "release", label: `Approve and pay ${job.amountUsdc} USDC`, primary: true, confirm: "Pay the provider now? This can't be undone." });
+  // Paying is the main action only once the work is in; before that it is a small "pay early" option.
+  if ((isClient || isEvaluator) && job.status === "Submitted" && !reviewOver)
+    actions.push({ fn: "release", label: `Approve and pay ${job.amountUsdc} USDC`, primary: true, confirm: "Pay the agent now? This can't be undone." });
   if (isEvaluator && job.status === "Submitted" && !reviewOver) actions.push({ fn: "reject", label: "Reject the work (refund the client)", confirm: "Reject this delivery and refund the client? This can't be undone." });
   if (isProvider) actions.push({ fn: "cancel", label: "Give up the job (refund the client)", confirm: "Cancel the job and send the USDC back to the client? This can't be undone." });
   if (isClient && job.status === "Funded" && !expired) actions.push({ fn: "extendDeadline", label: "Give 7 more days", args: [BigInt(Math.floor(job.deadline / 1000) + 7 * 86_400)] });
   if (expired) actions.push({ fn: "refundExpired", label: "Refund the client (deadline passed)", primary: true });
+  if ((isClient || isEvaluator) && job.status === "Funded" && !expired)
+    actions.push({ fn: "release", label: "Pay early (before delivery)", confirm: "Nothing has been delivered yet. Pay the agent now anyway? This can't be undone." });
   if (reviewOver) actions.push({ fn: "claimTimeout", label: "Pay the provider (review time is over)", primary: true });
 
   const run = async (a: Action) => {

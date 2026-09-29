@@ -1,7 +1,7 @@
 import { FUCI_LAUNCH, FUCI_TOKEN, FUCI_TREASURY, GITHUB_URL, X_URL } from "./config";
 import { ERC8004 } from "./erc8004Abi";
 import { factoryAddress } from "./factory";
-import { escrowInfo } from "./escrow";
+import { escrowInfo, recentJobs } from "./escrow";
 import { getForest, treasuryBalance, type ForestEvent } from "./forest";
 import { storedIndex } from "./agentIndex";
 import { getStats, kvGet, kvSet } from "./store";
@@ -21,7 +21,7 @@ export type PublicStats = {
   };
   payments: { x402Calls: number | null; usdcSettled: number | null; launchesScanned: number | null };
   trading: { trades: number; feesUsdc: number };
-  revenue: { creationFeesUsdc: number; tradeFeesUsdc: number; totalUsdc: number; treasuryUsdc: number | null; treasury: string };
+  revenue: { creationFeesUsdc: number; tradeFeesUsdc: number; earnFeesUsdc: number; escrowFeesUsdc: number; totalUsdc: number; treasuryUsdc: number | null; treasury: string };
   token: {
     address: string;
     supply: number;
@@ -81,6 +81,10 @@ export async function getPublicStats(): Promise<PublicStats> {
   const f = forest?.forest;
   const creation = f?.creationFeesUsdc ?? 0;
   const tradeFees = f?.tradeFeesUsdc ?? 0;
+  const earnFees = (await kvGet<number>("earn:fees:usdc") /* EARN_FEES_KEY in lib/earn.ts */.catch(() => null)) ?? 0;
+  // Escrow fees: the fee taken on every job paid out to its agent (fixed per job, read from the contract).
+  const escrowJobs = escrow ? await recentJobs(500).catch(() => []) : [];
+  const escrowFees = Math.round(escrowJobs.filter((j) => j.status === "Released").reduce((s, j) => s + (j.amountUsdc * j.feeBps) / 10_000, 0) * 1e6) / 1e6;
   const contracts = [
     { label: "FuciAgentFactory", address: factory ?? KNOWN_FACTORY },
     { label: "Treasury (Safe multisig)", address: treasury?.address ?? FUCI_TREASURY },
@@ -97,7 +101,7 @@ export async function getPublicStats(): Promise<PublicStats> {
     },
     payments: { x402Calls: stats?.calls ?? null, usdcSettled: stats?.usdcSettled ?? null, launchesScanned: stats?.launchesScanned ?? null },
     trading: { trades: f?.trades ?? 0, feesUsdc: tradeFees },
-    revenue: { creationFeesUsdc: creation, tradeFeesUsdc: tradeFees, totalUsdc: creation + tradeFees, treasuryUsdc: treasury?.usdc ?? null, treasury: treasury?.address ?? FUCI_TREASURY },
+    revenue: { creationFeesUsdc: creation, tradeFeesUsdc: tradeFees, earnFeesUsdc: earnFees, escrowFeesUsdc: escrowFees, totalUsdc: creation + tradeFees + earnFees + escrowFees, treasuryUsdc: treasury?.usdc ?? null, treasury: treasury?.address ?? FUCI_TREASURY },
     token: { address: FUCI_TOKEN, supply: FUCI_LAUNCH.supply, buyTaxPct: FUCI_LAUNCH.buyTaxPct, sellTaxPct: FUCI_LAUNCH.sellTaxPct, market: mkt },
     escrow: escrow ? { address: escrow.address, lockedUsdc: escrow.lockedUsdc, jobs: escrow.jobs } : null,
     contracts,
@@ -105,6 +109,7 @@ export async function getPublicStats(): Promise<PublicStats> {
       { label: "CoinGecko", url: "https://www.coingecko.com/en/coins/fuci" },
       { label: "DefiLlama", url: "https://defillama.com/protocol/fuci" },
       { label: "DexScreener", url: `https://dexscreener.com/arc/${FUCI_TOKEN}` },
+      { label: "x402scan", url: "https://www.x402scan.com/server/43f91264-a63e-4ef9-84a4-17bcd00e411e" },
       { label: "Argus", url: `https://argus.world/token/${FUCI_TOKEN}` },
       { label: "GitHub", url: GITHUB_URL },
       { label: "X", url: X_URL },
