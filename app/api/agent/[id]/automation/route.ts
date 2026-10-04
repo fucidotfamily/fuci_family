@@ -105,29 +105,53 @@ export async function POST(
         const { sendToken } = await import("@/lib/trade");
         const { kvSet } = await import("@/lib/store");
         const positions = await getPositions(agent.id);
+        const remaining = { ...positions };
+        const failedTokens: `0x${string}`[] = [];
         let tokens = 0;
-        for (const p of Object.values(positions))
-          if (
-            await sendToken(
+        for (const [key, p] of Object.entries(positions)) {
+          try {
+            const tx = await sendToken(
               agent.id,
               p.token,
               agent.owner as `0x${string}`,
-            ).catch(() => null)
-          )
-            tokens++;
-        if (Object.keys(positions).length)
-          await kvSet(`positions:${agent.id}`, {});
+            );
+            if (tx) tokens++;
+          } catch (e) {
+            failedTokens.push(p.token);
+            console.error("[automation:withdraw-token]", { agentId: agent.id, token: p.token }, e);
+            continue;
+          }
+          // A hash confirms the transfer; null confirms an empty balance. Errors keep the position.
+          delete remaining[key];
+          // Persist each completed exit before proceeding. Do not swallow storage failures or
+          // mutate the object the memory backend already holds while processing the next token.
+          await kvSet(`positions:${agent.id}`, { ...remaining });
+        }
         const r = await withdrawAll(agent.id, agent.owner as `0x${string}`);
-        const tx = r.wallet ?? r.gateway;
-        if (!tx && !tokens)
+        const tx = r.wallet ?? r.gateway ?? r.eurc;
+        if (!tx && !tokens && !failedTokens.length)
           return NextResponse.json({ ok: true, nothing: true });
-        await pushHistory(agent.id, {
-          kind: "payment",
-          label: tokens
-            ? `Withdrew the agent's USDC and ${tokens} token(s) to its owner`
-            : "Withdrew the agent's USDC to its owner",
-          href: tx && /^0x[0-9a-f]{64}$/i.test(tx) ? explorerTx(tx) : undefined,
-        });
+        if (tx || tokens)
+          await pushHistory(agent.id, {
+            kind: "payment",
+            label: tokens
+              ? `Withdrew ${tokens} token(s)${tx ? " and stablecoin balances" : ""} to the agent's owner`
+              : "Withdrew the agent's stablecoin balances to its owner",
+            href: tx && /^0x[0-9a-f]{64}$/i.test(tx) ? explorerTx(tx) : undefined,
+          });
+        if (failedTokens.length)
+          return NextResponse.json(
+            {
+              ok: false,
+              code: "TOKEN_WITHDRAWAL_FAILED",
+              error: `Withdrawal incomplete: ${failedTokens.length} token transfer(s) could not be confirmed. Those positions are still tracked. Check your wallet before trying again.`,
+              partial: Boolean(tx || tokens),
+              failedTokens,
+              tokens,
+              ...r,
+            },
+            { status: 502 },
+          );
         return NextResponse.json({ ok: true, tokens, ...r });
       } finally {
         await releaseLock(agentLockKey(agent.id));

@@ -113,8 +113,14 @@ export function useTrading(agent: Owner, mine: boolean) {
 
   const withdraw = () =>
     act("withdraw", "wallet", async () => {
-      const r = await post(`/api/agent/${agent.id}/automation`, { action: "withdraw", ...(await signed(agent, "withdraw", "all to owner")) });
-      return r.nothing ? "Nothing to withdraw yet: the agent wallet is empty." : "Done. The agent's USDC and tokens are back in your wallet.";
+      try {
+        const r = await post(`/api/agent/${agent.id}/automation`, { action: "withdraw", ...(await signed(agent, "withdraw", "all to owner")) });
+        return r.nothing ? "Nothing to withdraw yet: the agent wallet is empty." : "Done. The agent's USDC and tokens are back in your wallet.";
+      } catch (e) {
+        // Some transfers may have succeeded before the error. Show the remaining positions now.
+        await load();
+        throw e;
+      }
     });
 
   return { agentId: agent.id, state, wallet, busy, msg, load, settings, save, addOrder, buyNow, sellNow, fund, withdraw };
