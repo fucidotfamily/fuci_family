@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test": "node --experimental-vm-modules --test tests/*.test.mjs",
     "mcp:pack": "cd mcp && npm pack --pack-destination ../public && mv ../public/fuci-mcp-*.tgz ../public/fuci-mcp.tgz",
     "contracts:build": "node scripts/build-contracts.mjs"
   },

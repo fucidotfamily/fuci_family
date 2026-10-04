@@ -215,11 +215,15 @@ export async function earnDeposit(agentId: string, vaultAddress: string, amount:
  */
 export async function earnWithdraw(agentId: string, vaultAddress: string, amount: number | "all") {
   if (ARC_NETWORK !== "mainnet") throw new Error("Earn runs on Arc mainnet only");
-  const v = await vaultOf(vaultAddress);
+  const address = vaultAddress.toLowerCase();
+  // Discovery limits new deposits, not exits from positions this agent already holds.
+  // Untracked vaults still need to pass the existing listing check before we sign anything.
+  const held = (await myVaults(agentId)).some((a) => a.toLowerCase() === address);
+  const listed = held ? undefined : await vaultOf(address);
   const { adapter } = await adapterFor(agentId);
-  const pos = (await kit().getPosition({ from: { adapter, chain: EARN_CHAIN }, vaultAddress: v.address, config: config() } as Parameters<EarnKit["getPosition"]>[0])) as unknown as {
-    currentBalance: string;
-  };
+  const pos = await kit().getPosition({ from: { adapter, chain: EARN_CHAIN }, vaultAddress: address, config: config() } as Parameters<EarnKit["getPosition"]>[0]);
+  if (pos.asset !== "USDC" && pos.asset !== "EURC") throw new Error("Unsupported Earn asset");
+  const v: Pick<Vault, "address" | "name" | "asset"> = { address, name: listed?.name ?? pos.vaultName, asset: pos.asset };
   const balance = Number(pos.currentBalance);
   if (!(balance > 0)) throw new Error("Nothing in this vault");
   const want = amount === "all" ? balance : Math.min(round6(amount), balance);
